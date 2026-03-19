@@ -1,4 +1,4 @@
-# /// script
+﻿# /// script
 # requires-python = ">=3.10"
 # dependencies = [
 #     "torch",
@@ -16,13 +16,13 @@ import os
 import shutil
 import random
 
-EMBED_DIM = 64
+EMBED_DIM = 256
 CONTEXT_SIZE = 8
-N_LAYERS = 3
-BATCH_SIZE = 64
+N_LAYERS = 6
+BATCH_SIZE = 512
 BRAIN_LR = 3e-3
 EMBED_LR = 1e-3
-EPOCHS = 5
+EPOCHS = 1
 CHROMA_PATH = "./engram_memory"
 SPECIAL_TOKENS = ["<START>", "<USER>", "<BOT>"]
 
@@ -58,7 +58,7 @@ class AttentionBlock(nn.Module):
 
 class AttentionBrain(nn.Module):
     """
-    Fixed-size reasoning engine — completely vocab-independent.
+    Fixed-size reasoning engine â€” completely vocab-independent.
     Size is O(embed_dim^2 * n_layers). Does not grow as vocabulary grows.
     Includes adaptive pondering: loops through blocks up to max_ponder times,
     with a learned halt gate deciding when to stop.
@@ -72,7 +72,7 @@ class AttentionBrain(nn.Module):
         self.max_ponder = max_ponder
 
     def forward(self, x):
-        # x: (B, T, D) — raw concept vectors from ChromaDB
+        # x: (B, T, D) â€” raw concept vectors from ChromaDB
         # Returns: (prediction, n_steps) where prediction is (B, D)
         T = x.size(1)
         positions = torch.arange(T, dtype=torch.long)
@@ -100,6 +100,11 @@ class AttentionBrain(nn.Module):
 
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="Engram Ingestion Engine")
+    parser.add_argument("--books", nargs="*", help="Specific book files to train on (e.g. corpus/84_frankenstein.txt). If omitted, uses all corpus files.")
+    args = parser.parse_args()
+
     print("Booting Engram Ingestion Engine...")
     print(f"Batch size: {BATCH_SIZE} | Context: {CONTEXT_SIZE} | Layers: {N_LAYERS}\n")
 
@@ -111,12 +116,19 @@ def main():
 
     # Read all .txt files from the corpus/ folder + training_data.txt
     corpus_files = []
-    if os.path.exists("training_data.txt"):
-        corpus_files.append("training_data.txt")
-    if os.path.exists("corpus"):
-        for fname in sorted(os.listdir("corpus")):
-            if fname.endswith(".txt"):
-                corpus_files.append(os.path.join("corpus", fname))
+    if args.books:
+        # Use only specified books
+        corpus_files = [b for b in args.books if os.path.exists(b)]
+        if not corpus_files:
+            print(f"Error: None of the specified books found: {args.books}")
+            return
+    else:
+        if os.path.exists("training_data.txt"):
+            corpus_files.append("training_data.txt")
+        if os.path.exists("corpus"):
+            for fname in sorted(os.listdir("corpus")):
+                if fname.endswith(".txt"):
+                    corpus_files.append(os.path.join("corpus", fname))
 
     if not corpus_files:
         print("Error: No training data found.")
@@ -179,7 +191,7 @@ def main():
     print(f"\n{len(paragraphs):,} paragraphs | {qa_pairs_detected} Q&A pairs detected")
     print(f"{len(sequences):,} total sequences | {len(unique_words):,} unique tokens")
 
-    # In-memory embedding cache — source of truth during training
+    # In-memory embedding cache â€” source of truth during training
     embed_cache = {w: torch.randn(EMBED_DIM).tolist() for w in unique_words}
 
     brain = AttentionBrain()
@@ -187,7 +199,7 @@ def main():
     print(f"Brain parameters: {sum(p.numel() for p in brain.parameters()):,} (fixed regardless of vocab size)")
 
     n_batches = (len(sequences) + BATCH_SIZE - 1) // BATCH_SIZE
-    print(f"\nTraining: {len(sequences):,} sequences → {n_batches:,} batches/epoch × {EPOCHS} epochs\n")
+    print(f"\nTraining: {len(sequences):,} sequences -> {n_batches:,} batches/epoch x {EPOCHS} epochs\n")
 
     brain.train()
     for epoch in range(EPOCHS):
@@ -213,7 +225,7 @@ def main():
                 [embed_cache[w] for w in all_batch_words], dtype=torch.float32
             ).requires_grad_(True)
 
-            # (B, T) index tensors → (B, T, D) and (B, D)
+            # (B, T) index tensors â†’ (B, T, D) and (B, D)
             ctx_idx = torch.tensor([[batch_idx[w] for w in cw] for cw in ctx_word_lists])
             tgt_idx = torch.tensor([batch_idx[w] for w in target_words])
 
@@ -246,7 +258,7 @@ def main():
 
         avg_loss = total_loss / n_steps
         avg_ponder = total_ponder_steps / n_steps
-        print(f"  Epoch {epoch + 1} complete — Avg Loss: {avg_loss:.4f} | Avg Ponder Steps: {avg_ponder:.2f}")
+        print(f"  Epoch {epoch + 1} complete â€” Avg Loss: {avg_loss:.4f} | Avg Ponder Steps: {avg_ponder:.2f}")
 
     # Normalize embeddings before saving
     print(f"\nNormalizing {len(embed_cache):,} concept vectors...")
@@ -264,10 +276,12 @@ def main():
         vocab_collection.add(ids=ids[i:i+chunk], embeddings=embeds[i:i+chunk], documents=ids[i:i+chunk])
 
     torch.save(brain.state_dict(), "engram_weights.pth")
-    print(f"Brain saved  → engram_weights.pth")
-    print(f"Vocab saved  → {CHROMA_PATH}/ ({len(embed_cache):,} concepts)")
+    print(f"Brain saved  â†’ engram_weights.pth")
+    print(f"Vocab saved  â†’ {CHROMA_PATH}/ ({len(embed_cache):,} concepts)")
     print("Run test_brain.py to chat.")
 
 
 if __name__ == "__main__":
     main()
+
+

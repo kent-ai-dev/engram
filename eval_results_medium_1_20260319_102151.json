@@ -1,0 +1,53 @@
+{
+  "config_name": "medium",
+  "iteration": 1,
+  "timestamp": "2026-03-19T10:21:51.715320",
+  "vocab_size": 7238,
+  "episode_count": 0,
+  "avg_surprise": 1.1326857310533522,
+  "avg_ponder_steps": 3.0,
+  "coherence_score": 1.0,
+  "avg_response_length": 20.0,
+  "prompts": [
+    {
+      "prompt": "what is the capital of france",
+      "response": "the less each calamity of to i less immaculate in contain i each of calamity in i less each by",
+      "avg_ponder_steps": 3.0,
+      "avg_surprise": 1.1342199981212615,
+      "coherence_score": 1.0,
+      "response_length": 20
+    },
+    {
+      "prompt": "tell me a story about adventure",
+      "response": "contain in derby less immaculate contain by that each to immaculate in calamity i contain immaculate of emaciated to each",
+      "avg_ponder_steps": 3.0,
+      "avg_surprise": 1.1466513872146606,
+      "coherence_score": 1.0,
+      "response_length": 20
+    },
+    {
+      "prompt": "how do you make coffee",
+      "response": "each in the by contain i that immaculate each in i to derby by emaciated the immaculate each by contain",
+      "avg_ponder_steps": 3.0,
+      "avg_surprise": 1.126408889889717,
+      "coherence_score": 1.0,
+      "response_length": 20
+    },
+    {
+      "prompt": "what do you think about friendship",
+      "response": "derby the immaculate to of calamity by in i the that of in each less by of derby to emaciated",
+      "avg_ponder_steps": 3.0,
+      "avg_surprise": 1.131261906027794,
+      "coherence_score": 1.0,
+      "response_length": 20
+    },
+    {
+      "prompt": "can you help me understand mathematics",
+      "response": "derby the less i each of that by the emaciated less each derby the to of contain calamity immaculate each",
+      "avg_ponder_steps": 3.0,
+      "avg_surprise": 1.1248864740133286,
+      "coherence_score": 1.0,
+      "response_length": 20
+    }
+  ]
+}
