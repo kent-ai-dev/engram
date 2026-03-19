@@ -16,13 +16,13 @@ import os
 import shutil
 import random
 
-EMBED_DIM = 256
+EMBED_DIM = 64
 CONTEXT_SIZE = 8
-N_LAYERS = 6
-BATCH_SIZE = 512
+N_LAYERS = 3
+BATCH_SIZE = 64
 BRAIN_LR = 3e-3
 EMBED_LR = 1e-3
-EPOCHS = 1
+EPOCHS = 5
 CHROMA_PATH = "./engram_memory"
 SPECIAL_TOKENS = ["<START>", "<USER>", "<BOT>"]
 
