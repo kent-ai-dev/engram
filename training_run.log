@@ -8,7 +8,7 @@ ITERATION 6 / 10
 ============================================================
 
 Step 1: No new books to download this iteration.
-Corpus: 8 books, ~873,970 words
+Corpus: 9 books, ~1,012,409 words
   Using full accumulated corpus for final convergence training.
 
 Step 2: Training 4 configurations...
@@ -16,50 +16,4 @@ Step 2: Training 4 configurations...
   --- Config: baseline (embed=64, ctx=8, layers=3, epochs=1) ---
   Patched hyperparams: embed_dim=64, context_size=8, n_layers=3, epochs=1
   Training baseline...
-  [CMD] C:\Python314\python.exe C:\Users\Administrator\Documents\Github\engram\ingest.py
-  Training FAILED for baseline: Traceback (most recent call last):
-  File "C:\Users\Administrator\Documents\Github\engram\ingest.py", line 285, in <module>
-    main()
-    ~~~~^^
-  File "C:\Users\Administrator\Documents\Github\engram\ingest.py", line 112, in main
-    shutil.rmtree(CHROMA_PATH)
-    ~~~~~~~~~~~~~^^^^^^^^^^^^^
-  File "C:\Python314\Lib\shutil.py", line 852, in rmtree
-    _rmtree_impl(path, dir_fd, onexc)
-    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Python314\Lib\shutil.py", line 705, in _rmtree_unsafe
-    onexc(os.unlink, fullname, err)
-    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Python314\Lib\shutil.py", line 701, in _rmtree_unsafe
-    os.unlink(fullname)
-    ~~~~~~~~~^^^^^^^^^^
-PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: './engram_memory\\chroma.sqlite3'
-
-
-  --- Config: medium (embed=96, ctx=12, layers=4, epochs=1) ---
-  Patched hyperparams: embed_dim=96, context_size=12, n_layers=4, epochs=1
-  Training medium...
-  [CMD] C:\Python314\python.exe C:\Users\Administrator\Documents\Github\engram\ingest.py
-  Training FAILED for medium: Traceback (most recent call last):
-  File "C:\Users\Administrator\Documents\Github\engram\ingest.py", line 285, in <module>
-    main()
-    ~~~~^^
-  File "C:\Users\Administrator\Documents\Github\engram\ingest.py", line 112, in main
-    shutil.rmtree(CHROMA_PATH)
-    ~~~~~~~~~~~~~^^^^^^^^^^^^^
-  File "C:\Python314\Lib\shutil.py", line 852, in rmtree
-    _rmtree_impl(path, dir_fd, onexc)
-    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Python314\Lib\shutil.py", line 705, in _rmtree_unsafe
-    onexc(os.unlink, fullname, err)
-    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Python314\Lib\shutil.py", line 701, in _rmtree_unsafe
-    os.unlink(fullname)
-    ~~~~~~~~~^^^^^^^^^^
-PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: './engram_memory\\chroma.sqlite3'
-
-
-  --- Config: large (embed=128, ctx=16, layers=5, epochs=1) ---
-  Patched hyperparams: embed_dim=128, context_size=16, n_layers=5, epochs=1
-  Training large...
   [CMD] C:\Python314\python.exe C:\Users\Administrator\Documents\Github\engram\ingest.py

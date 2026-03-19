@@ -109,7 +109,23 @@ def main():
     print(f"Batch size: {BATCH_SIZE} | Context: {CONTEXT_SIZE} | Layers: {N_LAYERS}\n")
 
     if os.path.exists(CHROMA_PATH):
-        shutil.rmtree(CHROMA_PATH)
+        # Windows: SQLite file may be locked by previous process; retry with delay
+        import time as _time
+        for _attempt in range(10):
+            try:
+                shutil.rmtree(CHROMA_PATH)
+                break
+            except PermissionError as _pe:
+                print(f"  ChromaDB rmtree locked (attempt {_attempt+1}/10), waiting 3s... {_pe}")
+                _time.sleep(3)
+        else:
+            # Fallback: rename old dir and create fresh
+            _old = CHROMA_PATH + f"_old_{int(_time.time())}"
+            try:
+                os.rename(CHROMA_PATH, _old)
+                print(f"  Renamed locked ChromaDB to {_old}")
+            except Exception as _re:
+                print(f"  WARNING: Could not remove or rename ChromaDB dir: {_re}. Will try to overwrite.")
 
     chroma_client = chromadb.PersistentClient(path=CHROMA_PATH)
     vocab_collection = chroma_client.create_collection(name="engram_vocab")

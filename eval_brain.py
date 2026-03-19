@@ -219,6 +219,18 @@ def main():
     vocab_size = len(embed_cache)
     print(f"Loaded {vocab_size} concept vectors.")
 
+    # Explicitly release ChromaDB client to unlock SQLite file for next training run
+    del vocab_collection
+    del all_data
+    try:
+        chroma_client._producer = None
+        chroma_client._consumer = None
+    except Exception:
+        pass
+    del chroma_client
+    import gc
+    gc.collect()
+
     # Pre-build vocab matrix for fast vectorized nearest-word search
     word_list = list(embed_cache.keys())
     word_to_idx = {w: i for i, w in enumerate(word_list)}

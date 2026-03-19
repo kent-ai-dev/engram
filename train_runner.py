@@ -255,6 +255,9 @@ def run_iteration(iteration, config, book_files=None):
         print(f"  Eval FAILED for {config_name}: {eval_stderr[:500]}")
         print(f"  Eval stdout: {eval_stdout[-500:]}")
 
+    # Wait for ChromaDB SQLite to fully release its file lock on Windows
+    time.sleep(5)
+
     # 4. Save checkpoint
     save_model_checkpoint(config_name, iteration)
 
