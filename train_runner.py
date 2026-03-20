@@ -18,11 +18,14 @@ REPO_DIR = Path(__file__).parent.resolve()
 # Config matrix: gradual scaling
 # Epochs=1 for CPU feasibility; corpus grows each iteration providing more data
 # target configs use smaller context to be tractable on CPU
+# NOTE: target_small was originally embed_dim=256 which exceeds 3600s CPU timeout (~4-7h).
+# Replaced with embed_dim=128, ctx=8, layers=6 (estimated ~1900s, same embed as large but
+# deeper/smaller-context) to stay within the 3600s training timeout on CPU.
 CONFIGS = [
     {"name": "baseline",     "embed_dim": 64,  "context_size": 8,  "n_layers": 3, "epochs": 1, "batch_size": 512},
     {"name": "medium",       "embed_dim": 96,  "context_size": 12, "n_layers": 4, "epochs": 1, "batch_size": 512},
     {"name": "large",        "embed_dim": 128, "context_size": 16, "n_layers": 5, "epochs": 1, "batch_size": 512},
-    {"name": "target_small", "embed_dim": 256, "context_size": 8,  "n_layers": 6, "epochs": 1, "batch_size": 512},
+    {"name": "target_small", "embed_dim": 128, "context_size": 8,  "n_layers": 6, "epochs": 1, "batch_size": 512},
 ]
 
 LOG_FILE = REPO_DIR / "training_log.jsonl"
@@ -39,18 +42,29 @@ def get_utf8_env():
 
 
 def run_cmd(cmd, cwd=None, timeout=7200):
-    """Run a command and return (returncode, stdout, stderr)."""
+    """Run a command and return (returncode, stdout, stderr).
+    Returns (-1, '', 'TIMEOUT: ...') on timeout instead of raising.
+    """
     print(f"  [CMD] {' '.join(cmd) if isinstance(cmd, list) else cmd}")
-    result = subprocess.run(
-        cmd,
-        cwd=cwd or REPO_DIR,
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-        env=get_utf8_env(),
-        encoding="utf-8",
-    )
-    return result.returncode, result.stdout, result.stderr
+    try:
+        result = subprocess.run(
+            cmd,
+            cwd=cwd or REPO_DIR,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            env=get_utf8_env(),
+            encoding="utf-8",
+        )
+        return result.returncode, result.stdout, result.stderr
+    except subprocess.TimeoutExpired as te:
+        err_msg = f"TIMEOUT: Command timed out after {timeout}s: {' '.join(cmd) if isinstance(cmd, list) else cmd}"
+        print(f"  [TIMEOUT] {err_msg}")
+        return -1, "", err_msg
+    except Exception as e:
+        err_msg = f"EXCEPTION in run_cmd: {type(e).__name__}: {e}"
+        print(f"  [ERROR] {err_msg}")
+        return -1, "", err_msg
 
 
 def update_hyperparams(embed_dim, context_size, n_layers, epochs, batch_size=256):
@@ -370,7 +384,13 @@ def main():
         print(f"\nStep 2: Training {len(CONFIGS)} configurations...")
         iteration_results = []
         for config in CONFIGS:
-            result = run_iteration(iteration, config, book_files=iter_book_files)
+            try:
+                result = run_iteration(iteration, config, book_files=iter_book_files)
+            except Exception as _exc:
+                import traceback as _tb
+                print(f"  EXCEPTION running config {config['name']}: {_exc}")
+                _tb.print_exc()
+                result = None
             if result:
                 iteration_results.append(result)
                 # Track loss history for stopping condition
@@ -437,9 +457,24 @@ def main():
         # Git commit
         git_commit(f"Iteration {iteration}: corpus={corpus_words} words, {len(iteration_results)} configs trained")
 
+        # Notify web server to reload the latest model weights
+        try:
+            import urllib.request
+            req = urllib.request.Request(
+                "http://localhost:5000/reload",
+                method="POST",
+                headers={"Content-Type": "application/json"},
+                data=b"{}",
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                reload_data = json.loads(resp.read())
+                print(f"  Web server reloaded: vocab={reload_data.get('vocab_size')}, iters={reload_data.get('iterations')}")
+        except Exception as e:
+            print(f"  Web server reload skipped (server may not be running): {e}")
+
         # Check stopping conditions
-        if all_books >= 8 and all_configs_done and iteration >= 5:
-            print(f"\nSTOPPING: All 8 books downloaded AND all configs tested AND >=5 iterations complete.")
+        if all_books >= 10 and all_configs_done and iteration >= 5:
+            print(f"\nSTOPPING: All 10 books downloaded AND all configs tested AND >=5 iterations complete.")
             break
 
         if iteration >= start_iteration + max_iterations - 1:

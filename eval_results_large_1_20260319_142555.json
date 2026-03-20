@@ -1,0 +1,53 @@
+{
+  "config_name": "large",
+  "iteration": 1,
+  "timestamp": "2026-03-19T14:25:55.883901",
+  "vocab_size": 7238,
+  "episode_count": 0,
+  "avg_surprise": 1.1748779316743216,
+  "avg_ponder_steps": 2.0,
+  "coherence_score": 1.0,
+  "avg_response_length": 12.0,
+  "prompts": [
+    {
+      "prompt": "what is the capital of france",
+      "response": "forget again flow reality occupy forget shrieks flow again to reality university",
+      "avg_ponder_steps": 2.0,
+      "avg_surprise": 1.1716568966706593,
+      "coherence_score": 1.0,
+      "response_length": 12
+    },
+    {
+      "prompt": "tell me a story about adventure",
+      "response": "again i forget vigilance oh occupy i represented shrieks rash university oh",
+      "avg_ponder_steps": 2.0,
+      "avg_surprise": 1.1688828468322754,
+      "coherence_score": 1.0,
+      "response_length": 12
+    },
+    {
+      "prompt": "how do you make coffee",
+      "response": "represented rash oh i occupy theme to rash vigilance oh forget to",
+      "avg_ponder_steps": 2.0,
+      "avg_surprise": 1.1801350514094036,
+      "coherence_score": 1.0,
+      "response_length": 12
+    },
+    {
+      "prompt": "what do you think about friendship",
+      "response": "university reality again flow i to oh theme forget represented shrieks oh",
+      "avg_ponder_steps": 2.0,
+      "avg_surprise": 1.1727900505065918,
+      "coherence_score": 1.0,
+      "response_length": 12
+    },
+    {
+      "prompt": "can you help me understand mathematics",
+      "response": "represented again vigilance rash oh shrieks again flow theme represented forget to",
+      "avg_ponder_steps": 2.0,
+      "avg_surprise": 1.1809248129526775,
+      "coherence_score": 1.0,
+      "response_length": 12
+    }
+  ]
+}

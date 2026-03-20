@@ -1,0 +1,53 @@
+{
+  "config_name": "medium",
+  "iteration": 1,
+  "timestamp": "2026-03-19T22:50:21.371944",
+  "vocab_size": 7238,
+  "episode_count": 0,
+  "avg_surprise": 1.1520974139372508,
+  "avg_ponder_steps": 2.0,
+  "coherence_score": 1.0,
+  "avg_response_length": 12.0,
+  "prompts": [
+    {
+      "prompt": "what is the capital of france",
+      "response": "favourite i undertake impelled oldest conquered and forsakes impelled gathered oldest the",
+      "avg_ponder_steps": 2.0,
+      "avg_surprise": 1.1524539391199748,
+      "coherence_score": 1.0,
+      "response_length": 12
+    },
+    {
+      "prompt": "tell me a story about adventure",
+      "response": "gathered conquered undertake gazing obstructed favourite the and undertake gazing forsakes impelled",
+      "avg_ponder_steps": 2.0,
+      "avg_surprise": 1.160536140203476,
+      "coherence_score": 1.0,
+      "response_length": 12
+    },
+    {
+      "prompt": "how do you make coffee",
+      "response": "favourite gathered the i money oldest but gathered impelled the conquered but",
+      "avg_ponder_steps": 2.0,
+      "avg_surprise": 1.1422577897707622,
+      "coherence_score": 1.0,
+      "response_length": 12
+    },
+    {
+      "prompt": "what do you think about friendship",
+      "response": "undertake and gathered oldest money the conquered undertake favourite money forsakes impelled",
+      "avg_ponder_steps": 2.0,
+      "avg_surprise": 1.1601235667864482,
+      "coherence_score": 1.0,
+      "response_length": 12
+    },
+    {
+      "prompt": "can you help me understand mathematics",
+      "response": "the gathered conquered i impelled the and obstructed conquered impelled undertake gazing",
+      "avg_ponder_steps": 2.0,
+      "avg_surprise": 1.1451156338055928,
+      "coherence_score": 1.0,
+      "response_length": 12
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "config_name": "medium",
+  "iteration": 1,
+  "timestamp": "2026-03-19T13:33:57.345188",
+  "vocab_size": 7238,
+  "episode_count": 0,
+  "avg_surprise": 1.1459208170572919,
+  "avg_ponder_steps": 1.0,
+  "coherence_score": 1.0,
+  "avg_response_length": 12.0,
+  "prompts": [
+    {
+      "prompt": "what is the capital of france",
+      "response": "purloined nights prepared reign kitchen disturbed considered emaciated the purloined disturbed remind",
+      "avg_ponder_steps": 1.0,
+      "avg_surprise": 1.142352283000946,
+      "coherence_score": 1.0,
+      "response_length": 12
+    },
+    {
+      "prompt": "tell me a story about adventure",
+      "response": "kitchen terms remind disturbed design reign nights the kitchen inflicted remind emaciated",
+      "avg_ponder_steps": 1.0,
+      "avg_surprise": 1.135817676782608,
+      "coherence_score": 1.0,
+      "response_length": 12
+    },
+    {
+      "prompt": "how do you make coffee",
+      "response": "disturbed reign prepared kitchen the disturbed reign emaciated design the pacific disturbed",
+      "avg_ponder_steps": 1.0,
+      "avg_surprise": 1.1532544593016307,
+      "coherence_score": 1.0,
+      "response_length": 12
+    },
+    {
+      "prompt": "what do you think about friendship",
+      "response": "remind the disturbed kitchen considered remind the pacific reign disturbed kitchen prepared",
+      "avg_ponder_steps": 1.0,
+      "avg_surprise": 1.1451095740000408,
+      "coherence_score": 1.0,
+      "response_length": 12
+    },
+    {
+      "prompt": "can you help me understand mathematics",
+      "response": "prepared disturbed reign design purloined inflicted nights terms kitchen emaciated reign disturbed",
+      "avg_ponder_steps": 1.0,
+      "avg_surprise": 1.153070092201233,
+      "coherence_score": 1.0,
+      "response_length": 12
+    }
+  ]
+}
