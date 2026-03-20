@@ -232,8 +232,14 @@ def run_iteration(iteration, config, book_files=None):
     cmd = [sys.executable, str(INGEST_PATH)]
     if book_files:
         cmd += ["--books"] + book_files
-    # Timeout per config: large/target_small need more time on CPU (up to 2h)
-    config_timeout = 7200 if config_name in ("large", "target_small") else 3600
+    # Timeout per config — scaled by model size:
+    # baseline: 3600s (1h), medium: 5400s (90min), large/target_small: 7200s (2h)
+    if config_name in ("large", "target_small"):
+        config_timeout = 7200
+    elif config_name == "medium":
+        config_timeout = 5400
+    else:
+        config_timeout = 3600
     rc, stdout, stderr = run_cmd(cmd, timeout=config_timeout)
     elapsed = time.time() - t0
 
