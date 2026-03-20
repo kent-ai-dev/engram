@@ -34,19 +34,19 @@ import random
 
 
 
-EMBED_DIM = 64
+EMBED_DIM = 128
 
 CONTEXT_SIZE = 8
 
-N_LAYERS = 3
+N_LAYERS = 6
 
-BATCH_SIZE = 64
+BATCH_SIZE = 512
 
 BRAIN_LR = 3e-3
 
 EMBED_LR = 1e-3
 
-EPOCHS = 5
+EPOCHS = 1
 
 CHROMA_PATH = "./engram_memory"
 
