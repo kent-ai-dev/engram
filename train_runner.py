@@ -22,10 +22,9 @@ REPO_DIR = Path(__file__).parent.resolve()
 # Replaced with embed_dim=128, ctx=8, layers=6 (estimated ~1900s, same embed as large but
 # deeper/smaller-context) to stay within the 3600s training timeout on CPU.
 CONFIGS = [
-    {"name": "baseline",     "embed_dim": 64,  "context_size": 8,  "n_layers": 3, "epochs": 1, "batch_size": 512},
-    {"name": "medium",       "embed_dim": 96,  "context_size": 12, "n_layers": 4, "epochs": 1, "batch_size": 512},
-    {"name": "large",        "embed_dim": 128, "context_size": 16, "n_layers": 5, "epochs": 1, "batch_size": 512},
-    {"name": "target_small", "embed_dim": 128, "context_size": 8,  "n_layers": 6, "epochs": 1, "batch_size": 512},
+    # DailyDialog run: single focused config — conversational data + wider context + more epochs
+    # Victorian multi-config matrix retired (word salad due to wrong data + 1 epoch)
+    {"name": "dialog",  "embed_dim": 96, "context_size": 32, "n_layers": 4, "epochs": 3, "batch_size": 256},
 ]
 
 LOG_FILE = REPO_DIR / "training_log.jsonl"
@@ -200,19 +199,9 @@ def download_books(book_ids):
     return result.returncode == 0
 
 
-# Books to download in order (spread across iterations)
-BOOK_SCHEDULE = [
-    ["84"],        # Iter 1: Frankenstein
-    ["1342"],      # Iter 2: Pride & Prejudice
-    ["345"],       # Iter 3: Dracula
-    ["35"],        # Iter 4: Time Machine
-    ["2701"],      # Iter 5: Moby Dick
-    ["76"],        # Iter 6: Huck Finn
-    ["98"],        # Iter 7: Tale of Two Cities
-    ["844"],       # Iter 8: Being Earnest
-    [],            # Iter 9: no new book
-    [],            # Iter 10: no new book
-]
+# DailyDialog mode: no Gutenberg books — train on dailydialog.txt every iteration
+# Victorian book schedule retired (word salad from narrative text + 1 epoch)
+BOOK_SCHEDULE = [[] for _ in range(15)]  # no new books per iteration
 
 
 def run_iteration(iteration, config, book_files=None):
@@ -363,30 +352,16 @@ def main():
 
         # Determine which books to use for this iteration's training
         # Strategy: train on the current iteration's new book + training_data.txt
-        # This keeps each iteration fast (one book ~6-20 min) while sampling different text
-        # On later iterations (>5), train on ALL accumulated books for final convergence
+        # DailyDialog mode: always train on dailydialog.txt (12K real conversations)
         corpus_dir = REPO_DIR / "corpus"
-        if iteration > 5:
-            # Final iterations: train on full corpus for convergence
-            iter_book_files = None
-            print("  Using full accumulated corpus for final convergence training.")
+        dailydialog_path = corpus_dir / "dailydialog.txt"
+        if dailydialog_path.exists():
+            iter_book_files = [str(dailydialog_path)]
+            print(f"  Training on: DailyDialog corpus ({dailydialog_path})")
         else:
-            # Early iterations: train on current book + base training data
-            # Find the book downloaded for this iteration
-            scheduled_ids = BOOK_SCHEDULE[book_idx] if book_idx < len(BOOK_SCHEDULE) else []
-            iter_book_files = []
-            if (REPO_DIR / "training_data.txt").exists():
-                iter_book_files.append("training_data.txt")
-            for bid in scheduled_ids:
-                matching = [f for f in books_in_corpus if f.startswith(f"{bid}_")]
-                if matching:
-                    iter_book_files.append(str(corpus_dir / matching[0]))
-            # If no specific books for this iteration, fall back to Frankenstein (first book)
-            if not any(f.startswith(str(corpus_dir)) for f in iter_book_files):
-                frankenstein = [f for f in books_in_corpus if "84_" in f]
-                if frankenstein:
-                    iter_book_files.append(str(corpus_dir / frankenstein[0]))
-            print(f"  Training on: {iter_book_files}")
+            # Fallback: full corpus if dailydialog missing
+            iter_book_files = None
+            print("  WARNING: dailydialog.txt not found, using full corpus as fallback.")
 
         # Step 2: Train all configs
         print(f"\nStep 2: Training {len(CONFIGS)} configurations...")
