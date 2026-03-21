@@ -224,11 +224,13 @@ def run_iteration(iteration, config, book_files=None):
     # Timeout per config — scaled by model size:
     # baseline: 3600s (1h), medium: 5400s (90min), large/target_small: 7200s (2h)
     if config_name in ("large", "target_small"):
-        config_timeout = 7200
+        config_timeout = 10800  # 3h
     elif config_name == "medium":
-        config_timeout = 5400
+        config_timeout = 7200   # 2h
+    elif config_name == "dialog":
+        config_timeout = 14400  # 4h — DailyDialog 6.2MB corpus is CPU-intensive
     else:
-        config_timeout = 3600
+        config_timeout = 7200   # 2h default
     rc, stdout, stderr = run_cmd(cmd, timeout=config_timeout)
     elapsed = time.time() - t0
 
