@@ -1,0 +1,53 @@
+{
+  "config_name": "baseline",
+  "iteration": 5,
+  "timestamp": "2026-03-21T00:49:26.928741",
+  "vocab_size": 17535,
+  "episode_count": 0,
+  "avg_surprise": 1.0844154496987661,
+  "avg_ponder_steps": 1.0,
+  "coherence_score": 1.0,
+  "avg_response_length": 12.0,
+  "prompts": [
+    {
+      "prompt": "what is the capital of france",
+      "response": "sketching studying manillas domineered travellers violent brewery sketching stout studying author a",
+      "avg_ponder_steps": 1.0,
+      "avg_surprise": 1.0831886927286785,
+      "coherence_score": 1.0,
+      "response_length": 12
+    },
+    {
+      "prompt": "tell me a story about adventure",
+      "response": "the travellers stout author sketching migratory studying manillas domineered travellers brewery sanctum",
+      "avg_ponder_steps": 1.0,
+      "avg_surprise": 1.0925755302111309,
+      "coherence_score": 1.0,
+      "response_length": 12
+    },
+    {
+      "prompt": "how do you make coffee",
+      "response": "manillas sanctum hydrants stout brewery studying migratory a domineered sketching hydrants author",
+      "avg_ponder_steps": 1.0,
+      "avg_surprise": 1.0856730540593464,
+      "coherence_score": 1.0,
+      "response_length": 12
+    },
+    {
+      "prompt": "what do you think about friendship",
+      "response": "manillas a sketching violent author the sunday a domineered studying hydrants author",
+      "avg_ponder_steps": 1.0,
+      "avg_surprise": 1.0775641550620396,
+      "coherence_score": 1.0,
+      "response_length": 12
+    },
+    {
+      "prompt": "can you help me understand mathematics",
+      "response": "hydrants travellers manillas a stout violent hydrants studying manillas domineered sanctum brewery",
+      "avg_ponder_steps": 1.0,
+      "avg_surprise": 1.083075816432635,
+      "coherence_score": 1.0,
+      "response_length": 12
+    }
+  ]
+}
