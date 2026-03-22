@@ -1,3 +1,14 @@
+---
+title: Engram
+emoji: 🧠
+colorFrom: blue
+colorTo: purple
+sdk: gradio
+sdk_version: "4.44.0"
+app_file: app.py
+pinned: false
+---
+
 # engram
 
 A miniature agentic language model built from scratch using PyTorch — no pre-trained weights, no APIs. Engram departs from traditional LLMs by embedding **agentic reasoning** and **persistent memory** directly into the architecture.
