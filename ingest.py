@@ -46,7 +46,7 @@ BRAIN_LR = 3e-3
 
 EMBED_LR = 1e-3
 
-EPOCHS = 3
+EPOCHS = 1
 
 CHROMA_PATH = "./engram_memory"
 
