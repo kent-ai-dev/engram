@@ -21,9 +21,9 @@ import json
 import sys
 from datetime import datetime
 
-EMBED_DIM = 64
-CONTEXT_SIZE = 8
-N_LAYERS = 3
+EMBED_DIM = 96
+CONTEXT_SIZE = 32
+N_LAYERS = 4
 TEMPERATURE = 0.9
 TOP_K = 10
 CHROMA_PATH = "./engram_memory"
