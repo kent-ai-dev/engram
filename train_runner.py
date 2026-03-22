@@ -22,9 +22,9 @@ REPO_DIR = Path(__file__).parent.resolve()
 # Replaced with embed_dim=128, ctx=8, layers=6 (estimated ~1900s, same embed as large but
 # deeper/smaller-context) to stay within the 3600s training timeout on CPU.
 CONFIGS = [
-    # DailyDialog run: single focused config — conversational data + wider context + more epochs
+    # DailyDialog run: single focused config - conversational data + wider context + more epochs
     # Victorian multi-config matrix retired (word salad due to wrong data + 1 epoch)
-    {"name": "dialog",  "embed_dim": 96, "context_size": 32, "n_layers": 4, "epochs": 3, "batch_size": 256},
+    {"name": "dialog",  "embed_dim": 96, "context_size": 32, "n_layers": 4, "epochs": 1, "batch_size": 256},
 ]
 
 LOG_FILE = REPO_DIR / "training_log.jsonl"
@@ -199,7 +199,7 @@ def download_books(book_ids):
     return result.returncode == 0
 
 
-# DailyDialog mode: no Gutenberg books — train on dailydialog.txt every iteration
+# DailyDialog mode: no Gutenberg books - train on dailydialog.txt every iteration
 # Victorian book schedule retired (word salad from narrative text + 1 epoch)
 BOOK_SCHEDULE = [[] for _ in range(15)]  # no new books per iteration
 
@@ -221,14 +221,14 @@ def run_iteration(iteration, config, book_files=None):
     cmd = [sys.executable, str(INGEST_PATH)]
     if book_files:
         cmd += ["--books"] + book_files
-    # Timeout per config — scaled by model size:
+    # Timeout per config - scaled by model size:
     # baseline: 3600s (1h), medium: 5400s (90min), large/target_small: 7200s (2h)
     if config_name in ("large", "target_small"):
         config_timeout = 10800  # 3h
     elif config_name == "medium":
         config_timeout = 7200   # 2h
     elif config_name == "dialog":
-        config_timeout = 14400  # 4h — DailyDialog 6.2MB corpus is CPU-intensive
+        config_timeout = 3600  # 1h - using 20% subset (1.2MB), tractable on CPU
     else:
         config_timeout = 7200   # 2h default
     rc, stdout, stderr = run_cmd(cmd, timeout=config_timeout)
@@ -356,7 +356,9 @@ def main():
         # Strategy: train on the current iteration's new book + training_data.txt
         # DailyDialog mode: always train on dailydialog.txt (12K real conversations)
         corpus_dir = REPO_DIR / "corpus"
-        dailydialog_path = corpus_dir / "dailydialog.txt"
+        dailydialog_path = corpus_dir / "dailydialog_small.txt"  # 20% subset (~1.2MB) for tractable CPU training
+        if not dailydialog_path.exists():
+            dailydialog_path = corpus_dir / "dailydialog.txt"  # fallback to full if small not found
         if dailydialog_path.exists():
             iter_book_files = [str(dailydialog_path)]
             print(f"  Training on: DailyDialog corpus ({dailydialog_path})")
