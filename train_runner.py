@@ -228,7 +228,7 @@ def run_iteration(iteration, config, book_files=None):
     elif config_name == "medium":
         config_timeout = 7200   # 2h
     elif config_name == "dialog":
-        config_timeout = 3600  # 1h - using 20% subset (1.2MB), tractable on CPU
+        config_timeout = 2700  # 45min - using 5% subset (290KB), tractable on CPU
     else:
         config_timeout = 7200   # 2h default
     rc, stdout, stderr = run_cmd(cmd, timeout=config_timeout)
@@ -356,7 +356,9 @@ def main():
         # Strategy: train on the current iteration's new book + training_data.txt
         # DailyDialog mode: always train on dailydialog.txt (12K real conversations)
         corpus_dir = REPO_DIR / "corpus"
-        dailydialog_path = corpus_dir / "dailydialog_small.txt"  # 20% subset (~1.2MB) for tractable CPU training
+        dailydialog_path = corpus_dir / "dailydialog_tiny.txt"  # 5% subset (~290KB) for tractable CPU training
+        if not dailydialog_path.exists():
+            dailydialog_path = corpus_dir / "dailydialog_small.txt"  # fallback to 20%
         if not dailydialog_path.exists():
             dailydialog_path = corpus_dir / "dailydialog.txt"  # fallback to full if small not found
         if dailydialog_path.exists():
