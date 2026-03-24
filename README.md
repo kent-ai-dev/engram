@@ -12,6 +12,8 @@ app_file: app.py
 
 # Engram
 
+> 📖 **Read the full story**: [Engram: A New Type of AI](https://dev.to/nodefiend/engram-a-new-type-of-ai-1jbd) on DEV Community
+
 A miniature agentic language model built from scratch using PyTorch — no pre-trained weights, no APIs. Engram departs from traditional LLMs by embedding **agentic reasoning** and **persistent memory** directly into the architecture.
 
 ## Architecture
