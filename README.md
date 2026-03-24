@@ -7,6 +7,9 @@ sdk: gradio
 sdk_version: 4.44.0
 app_file: app.py
 ---
+
+![Engram](https://media2.dev.to/dynamic/image/width=1000,height=420,fit=cover,gravity=auto,format=auto/https%3A%2F%2Fdev-to-uploads.s3.amazonaws.com%2Fuploads%2Farticles%2Ftc7rra34vaay4gczhw78.png)
+
 # Engram
 
 A miniature agentic language model built from scratch using PyTorch — no pre-trained weights, no APIs. Engram departs from traditional LLMs by embedding **agentic reasoning** and **persistent memory** directly into the architecture.
