@@ -28,6 +28,7 @@ TEMPERATURE = 0.9
 TOP_K = 10
 CHROMA_PATH = "./engram_memory"
 WEIGHTS_PATH = "./engram_weights.pth"
+EVAL_OUTPUT_DIR = "eval_runs"
 NGRAM_TABLE_SIZE = 4999
 
 TEST_PROMPTS = [
@@ -358,9 +359,13 @@ def main():
         "prompts": results_per_prompt,
     }
 
-    # Save results
+    # Save results under eval_runs/ (gitignored)
+    os.makedirs(EVAL_OUTPUT_DIR, exist_ok=True)
     timestamp_str = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    output_file = f"eval_results_{CONFIG_NAME}_{ITERATION}_{timestamp_str}.json"
+    output_file = os.path.join(
+        EVAL_OUTPUT_DIR,
+        f"eval_results_{CONFIG_NAME}_{ITERATION}_{timestamp_str}.json",
+    )
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(metrics, f, indent=2)
 

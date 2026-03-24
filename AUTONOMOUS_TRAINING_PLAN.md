@@ -72,7 +72,7 @@ Engram is a 137k-parameter agentic language model with adaptive pondering, surpr
 - Remove interactive input loop, replace with test_prompts array
 - Capture generation output instead of printing to console
 - Calculate coherence: count real words from vocab vs nonsense
-- Save results to `eval_results_<timestamp>.json`
+- Save results to `eval_runs/eval_results_<timestamp>.json`
 
 ---
 
@@ -165,7 +165,7 @@ ITERATION WORKFLOW:
 
 3. EVALUATION
    - Each config automatically evaluated via eval_brain.py
-   - Results saved to eval_results_<config>_<iteration>.json
+   - Results saved to eval_runs/eval_results_<config>_<iteration>.json
 
 4. ANALYSIS
    - Compare configs: Which improved most? Which metrics matter?
@@ -240,7 +240,7 @@ ls models/                         # See saved checkpoints
 
 **Check intermediate results:**
 ```bash
-cat eval_results_baseline_1.json  # View specific config evaluation
+cat eval_runs/eval_results_baseline_1_*.json  # View specific config evaluation
 git log --oneline                  # See iteration commits
 ```
 
@@ -291,9 +291,9 @@ uv run test_brain.py  # Test target config
    - Format: `engram_weights_{config_name}_{iteration}.pth`
    - Allows comparing models across iterations
 
-5. **`/Users/kennethchambers/Documents/GitHub/engram/eval_results_*.json`**
+5. **`/Users/kennethchambers/Documents/GitHub/engram/eval_runs/eval_results_*.json`** (gitignored)
    - Evaluation results per config per iteration
-   - Format: `eval_results_{config}_{iteration}.json`
+   - Format: `eval_runs/eval_results_{config}_{iteration}_{timestamp}.json`
 
 ### Modified Files
 

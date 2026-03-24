@@ -1,1 +1,5 @@
 __pycache__/
+
+# Evaluation artifacts (keeps repo root clean)
+eval_runs/
+eval_results_*.json
