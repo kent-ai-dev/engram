@@ -17,6 +17,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPERATURE = 0.9
 TOP_K = 10
 GEN_STEPS = 20
+NGRAM_TABLE_SIZE = 4999
 
 # ── Model Architecture ───────────────────────────────────────────────────────
 
@@ -51,6 +52,51 @@ class AttentionBlock(nn.Module):
         return x
 
 
+class EngramModule(nn.Module):
+    """N-gram embedding tables with learned gating."""
+    HASH_PRIME = 31
+
+    def __init__(self, embed_dim, table_size=NGRAM_TABLE_SIZE):
+        super().__init__()
+        half_dim = embed_dim // 2
+        self.embed_dim = embed_dim
+        self.table_size = table_size
+        self.bigram_table = nn.Embedding(table_size, half_dim)
+        self.trigram_table = nn.Embedding(table_size, half_dim)
+        self.W_K = nn.Linear(embed_dim, embed_dim, bias=False)
+        self.W_V = nn.Linear(embed_dim, embed_dim, bias=False)
+        nn.init.normal_(self.bigram_table.weight, std=0.02)
+        nn.init.normal_(self.trigram_table.weight, std=0.02)
+
+    def hash_bigram(self, id1, id2):
+        return ((id1 * self.HASH_PRIME) ^ id2) % self.table_size
+
+    def hash_trigram(self, id1, id2, id3):
+        return (((id1 * self.HASH_PRIME) ^ id2) * self.HASH_PRIME ^ id3) % self.table_size
+
+    def lookup(self, word_ids):
+        if len(word_ids) >= 2:
+            bh = self.hash_bigram(word_ids[-2], word_ids[-1])
+            bigram_emb = self.bigram_table(torch.tensor(bh))
+        else:
+            bigram_emb = torch.zeros(self.embed_dim // 2)
+        if len(word_ids) >= 3:
+            th = self.hash_trigram(word_ids[-3], word_ids[-2], word_ids[-1])
+            trigram_emb = self.trigram_table(torch.tensor(th))
+        else:
+            trigram_emb = torch.zeros(self.embed_dim // 2)
+        return torch.cat([bigram_emb, trigram_emb], dim=-1)
+
+    def gate(self, hidden_state, memory_vector):
+        k = self.W_K(memory_vector)
+        v = self.W_V(memory_vector)
+        alpha = torch.sigmoid(
+            (F.normalize(hidden_state, dim=-1) * F.normalize(k, dim=-1)).sum(-1, keepdim=True)
+            / (hidden_state.size(-1) ** 0.5)
+        )
+        return alpha * v
+
+
 class AttentionBrain(nn.Module):
     def __init__(self, embed_dim, context_size, n_layers, max_ponder=3):
         super().__init__()
@@ -62,7 +108,7 @@ class AttentionBrain(nn.Module):
         self.halt_gate = nn.Linear(embed_dim, 1)
         self.max_ponder = max_ponder
 
-    def forward(self, x):
+    def forward(self, x, ngram_memory=None, engram_module=None):
         T = x.size(1)
         positions = torch.arange(T, dtype=torch.long)
         x = x + self.pos_embed(positions).unsqueeze(0)
@@ -71,8 +117,12 @@ class AttentionBrain(nn.Module):
         remaining = torch.ones(x.size(0), 1)
 
         for _ in range(self.max_ponder):
-            for block in self.blocks:
+            for block_idx, block in enumerate(self.blocks):
                 x = block(x)
+                if block_idx == 0 and ngram_memory is not None and engram_module is not None:
+                    gated_mem = engram_module.gate(x[:, -1, :], ngram_memory)
+                    x = x.clone()
+                    x[:, -1, :] = x[:, -1, :] + gated_mem
             last_token = x[:, -1, :]
             halt_prob = torch.sigmoid(self.halt_gate(last_token))
             output = output + remaining * last_token
@@ -99,7 +149,8 @@ def nearest_words(predicted_t, word_list, vocab_matrix, word_to_idx, n=TOP_K, pe
     return [(word_list[i.item()], top_dists[j].item()) for j, i in enumerate(top_idx)]
 
 
-def generate_response(brain, word_list, vocab_matrix, word_to_idx, prompt_words, context_size):
+def generate_response(brain, word_list, vocab_matrix, word_to_idx, prompt_words, context_size,
+                      engram_module=None, word_to_id=None):
     SKIP = {"<START>", "<BOT>", "<USER>"}
     embed_dim = vocab_matrix.shape[1]
     context = ["<START>"] * context_size
@@ -119,7 +170,16 @@ def generate_response(brain, word_list, vocab_matrix, word_to_idx, prompt_words,
         ctx_stack = torch.stack(ctx_tensors)
 
         with torch.no_grad():
-            predicted = brain(ctx_stack.unsqueeze(0))
+            # Compute N-gram memory
+            ngram_memory = None
+            if engram_module is not None and word_to_id is not None:
+                ctx_words = context[-3:]
+                ids = [word_to_id.get(w, 0) for w in ctx_words]
+                ngram_memory = engram_module.lookup(ids).unsqueeze(0)
+
+            predicted = brain(ctx_stack.unsqueeze(0),
+                              ngram_memory=ngram_memory,
+                              engram_module=engram_module)
             predicted = predicted.squeeze(0)
 
         penalty = {w: 3.0 for w in set(recent[-4:])}
@@ -178,12 +238,26 @@ def load_engram():
     brain.load_state_dict(state_dict)
     brain.eval()
 
-    return brain, word_list, vocab_matrix, word_to_idx, context_size, len(embed_cache)
+    # Load EngramModule if available
+    engram_module = None
+    word_to_id = None
+    engram_path = os.path.join(BASE_DIR, "engram_memory_module.pth")
+    w2id_path = os.path.join(BASE_DIR, "engram_word_to_id.pth")
+    if os.path.exists(engram_path) and os.path.exists(w2id_path):
+        engram_module = EngramModule(embed_dim)
+        engram_module.load_state_dict(torch.load(engram_path, map_location="cpu", weights_only=True))
+        word_to_id = torch.load(w2id_path, map_location="cpu", weights_only=False)
+        engram_module.eval()
+        engram_params = sum(p.numel() for p in engram_module.parameters())
+        print(f"Loaded Engram memory module ({engram_params:,} params)")
+
+    return brain, word_list, vocab_matrix, word_to_idx, context_size, len(embed_cache), engram_module, word_to_id
 
 
 print("Loading Engram model...")
-brain, word_list, vocab_matrix, word_to_idx, context_size, vocab_size = load_engram()
-print(f"Engram loaded: {vocab_size:,} words, embed={vocab_matrix.shape[1]}, ctx={context_size}")
+brain, word_list, vocab_matrix, word_to_idx, context_size, vocab_size, engram_module, word_to_id = load_engram()
+engram_status = f", engram={'yes' if engram_module else 'no'}"
+print(f"Engram loaded: {vocab_size:,} words, embed={vocab_matrix.shape[1]}, ctx={context_size}{engram_status}")
 
 
 # ── Gradio Interface ──────────────────────────────────────────────────────────
@@ -192,7 +266,8 @@ def chat(message, history):
     prompt_words = re.findall(r"\b\w+\b", message.lower())
     if not prompt_words:
         return "..."
-    return generate_response(brain, word_list, vocab_matrix, word_to_idx, prompt_words, context_size)
+    return generate_response(brain, word_list, vocab_matrix, word_to_idx, prompt_words, context_size,
+                             engram_module=engram_module, word_to_id=word_to_id)
 
 
 demo = gr.ChatInterface(
@@ -200,7 +275,7 @@ demo = gr.ChatInterface(
     title="Engram — Custom Neural Net Chat",
     description=(
         f"Trained from scratch on conversational data. No LLM APIs, no pre-trained weights. "
-        f"Vocab: {vocab_size:,} words | Architecture: AttentionBrain "
+        f"Vocab: {vocab_size:,} words | Architecture: AttentionBrain + Conditional Memory "
         f"(embed={vocab_matrix.shape[1]}, ctx={context_size}, layers={max(int(k.split('.')[1]) for k in brain.state_dict() if k.startswith('blocks.')) + 1})"
     ),
     examples=["Hello how are you", "What do you like to do", "Tell me about yourself"],

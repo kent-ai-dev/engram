@@ -28,6 +28,7 @@ TEMPERATURE = 0.9
 TOP_K = 10
 CHROMA_PATH = "./engram_memory"
 WEIGHTS_PATH = "./engram_weights.pth"
+NGRAM_TABLE_SIZE = 4999
 
 TEST_PROMPTS = [
     "what is the capital of france",
@@ -70,6 +71,51 @@ class AttentionBlock(nn.Module):
         return x
 
 
+class EngramModule(nn.Module):
+    """N-gram embedding tables with learned gating."""
+    HASH_PRIME = 31
+
+    def __init__(self, embed_dim, table_size=NGRAM_TABLE_SIZE):
+        super().__init__()
+        half_dim = embed_dim // 2
+        self.embed_dim = embed_dim
+        self.table_size = table_size
+        self.bigram_table = nn.Embedding(table_size, half_dim)
+        self.trigram_table = nn.Embedding(table_size, half_dim)
+        self.W_K = nn.Linear(embed_dim, embed_dim, bias=False)
+        self.W_V = nn.Linear(embed_dim, embed_dim, bias=False)
+        nn.init.normal_(self.bigram_table.weight, std=0.02)
+        nn.init.normal_(self.trigram_table.weight, std=0.02)
+
+    def hash_bigram(self, id1, id2):
+        return ((id1 * self.HASH_PRIME) ^ id2) % self.table_size
+
+    def hash_trigram(self, id1, id2, id3):
+        return (((id1 * self.HASH_PRIME) ^ id2) * self.HASH_PRIME ^ id3) % self.table_size
+
+    def lookup(self, word_ids):
+        if len(word_ids) >= 2:
+            bh = self.hash_bigram(word_ids[-2], word_ids[-1])
+            bigram_emb = self.bigram_table(torch.tensor(bh))
+        else:
+            bigram_emb = torch.zeros(self.embed_dim // 2)
+        if len(word_ids) >= 3:
+            th = self.hash_trigram(word_ids[-3], word_ids[-2], word_ids[-1])
+            trigram_emb = self.trigram_table(torch.tensor(th))
+        else:
+            trigram_emb = torch.zeros(self.embed_dim // 2)
+        return torch.cat([bigram_emb, trigram_emb], dim=-1)
+
+    def gate(self, hidden_state, memory_vector):
+        k = self.W_K(memory_vector)
+        v = self.W_V(memory_vector)
+        alpha = torch.sigmoid(
+            (F.normalize(hidden_state, dim=-1) * F.normalize(k, dim=-1)).sum(-1, keepdim=True)
+            / (hidden_state.size(-1) ** 0.5)
+        )
+        return alpha * v
+
+
 class AttentionBrain(nn.Module):
     def __init__(self, embed_dim=EMBED_DIM, context_size=CONTEXT_SIZE, n_layers=N_LAYERS, max_ponder=3):
         super().__init__()
@@ -79,7 +125,7 @@ class AttentionBrain(nn.Module):
         self.halt_gate = nn.Linear(embed_dim, 1)
         self.max_ponder = max_ponder
 
-    def forward(self, x):
+    def forward(self, x, ngram_memory=None, engram_module=None):
         T = x.size(1)
         positions = torch.arange(T, dtype=torch.long)
         x = x + self.pos_embed(positions).unsqueeze(0)
@@ -89,8 +135,12 @@ class AttentionBrain(nn.Module):
         n_steps = 0
 
         for _ in range(self.max_ponder):
-            for block in self.blocks:
+            for block_idx, block in enumerate(self.blocks):
                 x = block(x)
+                if block_idx == 0 and ngram_memory is not None and engram_module is not None:
+                    gated_mem = engram_module.gate(x[:, -1, :], ngram_memory)
+                    x = x.clone()
+                    x[:, -1, :] = x[:, -1, :] + gated_mem
             last_token = x[:, -1, :]
             halt_prob = torch.sigmoid(self.halt_gate(last_token))
             output = output + remaining * last_token
@@ -116,19 +166,16 @@ def nearest_words(predicted_t, word_list, vocab_matrix, word_to_idx, n=TOP_K, pe
     return [(word_list[i.item()], top_dists[j].item()) for j, i in enumerate(top_idx)]
 
 
-def generate_response(brain, embed_cache, word_list, vocab_matrix, word_to_idx, prompt_words, context_size):
-    """Generate a response for a given prompt, return (reply_words, avg_ponder_steps, avg_surprise).
-    
-    word_list, vocab_matrix, word_to_idx: pre-built for fast nearest-word search.
-    """
+def generate_response(brain, embed_cache, word_list, vocab_matrix, word_to_idx, prompt_words, context_size,
+                      engram_module=None, word_to_id=None):
+    """Generate a response for a given prompt, return (reply_words, avg_ponder_steps, avg_surprise)."""
     SKIP = {"<START>", "<BOT>", "<USER>"}
-    GEN_STEPS = 12  # reduced for speed
+    GEN_STEPS = 12
 
     context = ["<START>"] * context_size
     for w in (["<USER>"] + prompt_words + ["<BOT>"]):
         context.append(w)
 
-    # Build context embedding lookup: use vocab_matrix for known words
     def get_embed(word):
         if word in word_to_idx:
             return vocab_matrix[word_to_idx[word]]
@@ -144,7 +191,16 @@ def generate_response(brain, embed_cache, word_list, vocab_matrix, word_to_idx, 
         ctx_stack = torch.stack(ctx_tensors)
 
         with torch.no_grad():
-            predicted, n_steps = brain(ctx_stack.unsqueeze(0))
+            # Compute N-gram memory
+            ngram_memory = None
+            if engram_module is not None and word_to_id is not None:
+                ctx_words = context[-3:]
+                ids = [word_to_id.get(w, 0) for w in ctx_words]
+                ngram_memory = engram_module.lookup(ids).unsqueeze(0)
+
+            predicted, n_steps = brain(ctx_stack.unsqueeze(0),
+                                       ngram_memory=ngram_memory,
+                                       engram_module=engram_module)
             predicted = predicted.squeeze(0)
 
         ponder_steps_list.append(n_steps)
@@ -164,7 +220,6 @@ def generate_response(brain, embed_cache, word_list, vocab_matrix, word_to_idx, 
         chosen_idx = torch.multinomial(probs, 1).item()
         chosen_word = words_list[chosen_idx]
 
-        # Record surprise as the distance to the chosen word
         chosen_dist = filtered[chosen_idx][1]
         surprise_list.append(chosen_dist)
 
@@ -181,11 +236,6 @@ def generate_response(brain, embed_cache, word_list, vocab_matrix, word_to_idx, 
 
 
 def calculate_coherence(reply_words, embed_cache):
-    """
-    Coherence score: ratio of reply words that are real vocabulary words
-    (not special tokens, not purely numeric).
-    Words in embed_cache that aren't special tokens are considered 'real'.
-    """
     if not reply_words:
         return 0.0
     special = {"<start>", "<user>", "<bot>"}
@@ -241,16 +291,26 @@ def main():
 
     # Get episode count if available
     episode_count = 0
-    try:
-        ep_col = chroma_client.get_collection("engram_episodes")
-        episode_count = ep_col.count()
-    except Exception:
-        pass
 
-    # Load brain -- use global EMBED_DIM/CONTEXT_SIZE/N_LAYERS (patched by train_runner)
+    # Load brain
     brain = AttentionBrain(embed_dim=EMBED_DIM, context_size=CONTEXT_SIZE, n_layers=N_LAYERS)
     brain.load_state_dict(torch.load(weights_path, weights_only=True))
     brain.eval()
+
+    # Load EngramModule if available
+    engram_module = None
+    word_to_id = None
+    engram_module_path = os.path.join(os.path.dirname(weights_path) or ".", "engram_memory_module.pth")
+    word_to_id_path = os.path.join(os.path.dirname(weights_path) or ".", "engram_word_to_id.pth")
+    if os.path.exists(engram_module_path) and os.path.exists(word_to_id_path):
+        engram_module = EngramModule(EMBED_DIM)
+        engram_module.load_state_dict(torch.load(engram_module_path, weights_only=True))
+        word_to_id = torch.load(word_to_id_path, weights_only=False)
+        engram_module.eval()
+        engram_params = sum(p.numel() for p in engram_module.parameters())
+        print(f"Loaded Engram memory module ({engram_params:,} params)")
+    else:
+        print("No Engram memory module found — evaluating without N-gram memory.")
 
     results_per_prompt = []
     all_ponder_steps = []
@@ -262,7 +322,8 @@ def main():
         print(f"\nPrompt: {prompt}")
         prompt_words = re.findall(r"\b\w+\b", prompt.lower())
         reply, avg_ponder, avg_surprise = generate_response(
-            brain, embed_cache, word_list, vocab_matrix, word_to_idx, prompt_words, CONTEXT_SIZE
+            brain, embed_cache, word_list, vocab_matrix, word_to_idx, prompt_words, CONTEXT_SIZE,
+            engram_module=engram_module, word_to_id=word_to_id
         )
         coherence = calculate_coherence(reply, embed_cache)
         response_text = " ".join(reply) if reply else "(no response)"

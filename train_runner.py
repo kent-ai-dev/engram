@@ -126,6 +126,14 @@ def save_model_checkpoint(config_name, iteration):
     if weights_src.exists():
         shutil.copy2(weights_src, dest / "engram_weights.pth")
 
+    engram_mod_src = REPO_DIR / "engram_memory_module.pth"
+    if engram_mod_src.exists():
+        shutil.copy2(engram_mod_src, dest / "engram_memory_module.pth")
+
+    w2id_src = REPO_DIR / "engram_word_to_id.pth"
+    if w2id_src.exists():
+        shutil.copy2(w2id_src, dest / "engram_word_to_id.pth")
+
     chroma_src = REPO_DIR / "engram_memory"
     chroma_dest = dest / "engram_memory"
     if chroma_src.exists():

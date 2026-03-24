@@ -22,6 +22,7 @@ EMBED_LR = 1e-3
 TEMPERATURE = 0.9
 TOP_K = 10
 CHROMA_PATH = "./engram_memory"
+NGRAM_TABLE_SIZE = 4999
 
 
 class AttentionBlock(nn.Module):
@@ -53,6 +54,51 @@ class AttentionBlock(nn.Module):
         return x
 
 
+class EngramModule(nn.Module):
+    """N-gram embedding tables with learned gating."""
+    HASH_PRIME = 31
+
+    def __init__(self, embed_dim, table_size=NGRAM_TABLE_SIZE):
+        super().__init__()
+        half_dim = embed_dim // 2
+        self.embed_dim = embed_dim
+        self.table_size = table_size
+        self.bigram_table = nn.Embedding(table_size, half_dim)
+        self.trigram_table = nn.Embedding(table_size, half_dim)
+        self.W_K = nn.Linear(embed_dim, embed_dim, bias=False)
+        self.W_V = nn.Linear(embed_dim, embed_dim, bias=False)
+        nn.init.normal_(self.bigram_table.weight, std=0.02)
+        nn.init.normal_(self.trigram_table.weight, std=0.02)
+
+    def hash_bigram(self, id1, id2):
+        return ((id1 * self.HASH_PRIME) ^ id2) % self.table_size
+
+    def hash_trigram(self, id1, id2, id3):
+        return (((id1 * self.HASH_PRIME) ^ id2) * self.HASH_PRIME ^ id3) % self.table_size
+
+    def lookup(self, word_ids):
+        if len(word_ids) >= 2:
+            bh = self.hash_bigram(word_ids[-2], word_ids[-1])
+            bigram_emb = self.bigram_table(torch.tensor(bh))
+        else:
+            bigram_emb = torch.zeros(self.embed_dim // 2)
+        if len(word_ids) >= 3:
+            th = self.hash_trigram(word_ids[-3], word_ids[-2], word_ids[-1])
+            trigram_emb = self.trigram_table(torch.tensor(th))
+        else:
+            trigram_emb = torch.zeros(self.embed_dim // 2)
+        return torch.cat([bigram_emb, trigram_emb], dim=-1)
+
+    def gate(self, hidden_state, memory_vector):
+        k = self.W_K(memory_vector)
+        v = self.W_V(memory_vector)
+        alpha = torch.sigmoid(
+            (F.normalize(hidden_state, dim=-1) * F.normalize(k, dim=-1)).sum(-1, keepdim=True)
+            / (hidden_state.size(-1) ** 0.5)
+        )
+        return alpha * v
+
+
 class AttentionBrain(nn.Module):
     """Fixed-size reasoning engine — vocab-independent.
     Includes adaptive pondering: loops through blocks up to max_ponder times,
@@ -65,7 +111,7 @@ class AttentionBrain(nn.Module):
         self.halt_gate = nn.Linear(embed_dim, 1)  # ~65 new params
         self.max_ponder = max_ponder
 
-    def forward(self, x):
+    def forward(self, x, ngram_memory=None, engram_module=None):
         # x: (B, T, D) — returns (prediction, n_steps) where prediction is (B, D)
         T = x.size(1)
         positions = torch.arange(T, dtype=torch.long)
@@ -76,8 +122,13 @@ class AttentionBrain(nn.Module):
         n_steps = 0
 
         for _ in range(self.max_ponder):
-            for block in self.blocks:
+            for block_idx, block in enumerate(self.blocks):
                 x = block(x)
+                # Inject N-gram memory after first block (layer 0)
+                if block_idx == 0 and ngram_memory is not None and engram_module is not None:
+                    gated_mem = engram_module.gate(x[:, -1, :], ngram_memory)
+                    x = x.clone()
+                    x[:, -1, :] = x[:, -1, :] + gated_mem
             last_token = x[:, -1, :]
             halt_prob = torch.sigmoid(self.halt_gate(last_token))
 
@@ -115,7 +166,8 @@ def nearest_words(predicted_t, embed_cache, n=TOP_K, penalty=None):
     return [(words[i.item()], top_dists[j].item()) for j, i in enumerate(top_idx)]
 
 
-def generate(brain, embed_cache, context, episode_collection=None, show_thoughts=True):
+def generate(brain, embed_cache, context, engram_module=None, word_to_id=None,
+             episode_collection=None, show_thoughts=True):
     reply = []
     recent = []
     SKIP = {"<START>", "<BOT>"}
@@ -128,10 +180,19 @@ def generate(brain, embed_cache, context, episode_collection=None, show_thoughts
         ctx_stack = torch.stack(ctx_tensors)
 
         with torch.no_grad():
-            predicted, n_steps = brain(ctx_stack.unsqueeze(0))  # (1,T,D) → (D,), int
+            # Compute N-gram memory for current context
+            ngram_memory = None
+            if engram_module is not None and word_to_id is not None:
+                ctx_words = context[-3:]
+                ids = [word_to_id.get(w, 0) for w in ctx_words]
+                ngram_memory = engram_module.lookup(ids).unsqueeze(0)  # (1, D)
+
+            predicted, n_steps = brain(ctx_stack.unsqueeze(0),
+                                       ngram_memory=ngram_memory,
+                                       engram_module=engram_module)
             predicted = predicted.squeeze(0)
 
-            # Query episodic memory and blend with prediction
+            # Query episodic memory and blend with gated prediction
             if episode_collection is not None and episode_collection.count() > 0:
                 results = episode_collection.query(
                     query_embeddings=[predicted.tolist()], n_results=3
@@ -141,7 +202,12 @@ def generate(brain, embed_cache, context, episode_collection=None, show_thoughts
                     episode_embeds = [torch.tensor(embed_cache[w]) for w in episode_words if w in embed_cache]
                     if episode_embeds:
                         episode_signal = torch.stack(episode_embeds).mean(dim=0)
-                        predicted = 0.7 * predicted + 0.3 * episode_signal
+                        if engram_module is not None:
+                            # Learned gate replaces fixed 0.3 blend
+                            gated_episode = engram_module.gate(predicted, episode_signal)
+                            predicted = predicted + gated_episode
+                        else:
+                            predicted = 0.7 * predicted + 0.3 * episode_signal
                         if show_thoughts:
                             print(f"    Retrieved episodes: {episode_words[:3]}")
 
@@ -206,7 +272,24 @@ def main():
 
     brain = AttentionBrain()
     brain.load_state_dict(torch.load("engram_weights.pth", weights_only=True))
-    optimizer = optim.Adam(brain.parameters(), lr=BRAIN_LR)
+
+    # Load EngramModule if available
+    engram_module = None
+    word_to_id = None
+    if os.path.exists("engram_memory_module.pth") and os.path.exists("engram_word_to_id.pth"):
+        engram_module = EngramModule(EMBED_DIM)
+        engram_module.load_state_dict(torch.load("engram_memory_module.pth", weights_only=True))
+        word_to_id = torch.load("engram_word_to_id.pth", weights_only=False)
+        engram_module.eval()
+        engram_params = sum(p.numel() for p in engram_module.parameters())
+        print(f"Loaded Engram memory module ({engram_params:,} params, {len(word_to_id):,} word IDs)")
+    else:
+        print("No Engram memory module found — running without N-gram memory.")
+
+    all_params = list(brain.parameters())
+    if engram_module is not None:
+        all_params += list(engram_module.parameters())
+    optimizer = optim.Adam(all_params, lr=BRAIN_LR)
 
     print("Engram is alive. Type 'quit' to exit.\n")
 
@@ -227,9 +310,14 @@ def main():
         for w in user_words:
             if w not in embed_cache:
                 embed_cache[w] = torch.randn(EMBED_DIM).tolist()
+            # Also add to word_to_id if engram module is loaded
+            if word_to_id is not None and w not in word_to_id:
+                word_to_id[w] = len(word_to_id)
 
         # Online learning: carve an engram for this turn
         brain.train()
+        if engram_module is not None:
+            engram_module.train()
         step_counter = 0
         for word in user_words:
             ctx_tensors = [
@@ -239,8 +327,17 @@ def main():
             ctx_stack = torch.stack(ctx_tensors)
             target_t = torch.tensor(embed_cache[word], dtype=torch.float32, requires_grad=True)
 
+            # Compute N-gram memory
+            ngram_memory = None
+            if engram_module is not None and word_to_id is not None:
+                ctx_words = context[-3:]
+                ids = [word_to_id.get(w, 0) for w in ctx_words]
+                ngram_memory = engram_module.lookup(ids).unsqueeze(0)
+
             optimizer.zero_grad()
-            predicted, n_steps = brain(ctx_stack.unsqueeze(0))  # (1,T,D) → (D,), int
+            predicted, n_steps = brain(ctx_stack.unsqueeze(0),
+                                       ngram_memory=ngram_memory,
+                                       engram_module=engram_module)
             predicted = predicted.squeeze(0)
             loss = F.mse_loss(predicted, target_t)
 
@@ -280,8 +377,12 @@ def main():
 
         # Generate
         brain.eval()
+        if engram_module is not None:
+            engram_module.eval()
         print("\n--- Engram's Subconscious ---")
-        reply = generate(brain, embed_cache, context, episode_collection)
+        reply = generate(brain, embed_cache, context,
+                         engram_module=engram_module, word_to_id=word_to_id,
+                         episode_collection=episode_collection)
         print("----------------------------")
         print(f"\nEngram: {' '.join(reply) if reply else '(thinking...)'}")
 
@@ -294,6 +395,10 @@ def main():
         vocab_collection.upsert(ids=all_ids[i:i+chunk], embeddings=all_embeds[i:i+chunk], documents=all_ids[i:i+chunk])
 
     torch.save(brain.state_dict(), "engram_weights.pth")
+    if engram_module is not None:
+        torch.save(engram_module.state_dict(), "engram_memory_module.pth")
+    if word_to_id is not None:
+        torch.save(word_to_id, "engram_word_to_id.pth")
     episode_count = episode_collection.count()
     print(f"Session saved. {episode_count} episodes in memory. Goodbye.")
 
