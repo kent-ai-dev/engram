@@ -24,7 +24,7 @@ REPO_DIR = Path(__file__).parent.resolve()
 CONFIGS = [
     # DailyDialog run: single focused config - conversational data + wider context + more epochs
     # Victorian multi-config matrix retired (word salad due to wrong data + 1 epoch)
-    {"name": "dialog",  "embed_dim": 96, "context_size": 32, "n_layers": 4, "epochs": 1, "batch_size": 256},
+    {"name": "dialog",  "embed_dim": 96, "context_size": 32, "n_layers": 4, "epochs": 3, "batch_size": 256},
 ]
 
 LOG_FILE = REPO_DIR / "training_log.jsonl"

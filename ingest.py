@@ -46,11 +46,21 @@ BRAIN_LR = 3e-3
 
 EMBED_LR = 1e-3
 
-EPOCHS = 1
+EPOCHS = 3  # 3 passes needed: learned gates require multiple epochs to discover when N-gram memory helps
 
 CHROMA_PATH = "./engram_memory"
 
-NGRAM_TABLE_SIZE = 4999  # prime number for hash distribution
+# Training config rationale (updated for EngramModule / conditional memory architecture):
+#   NGRAM_TABLE_SIZE = 50021  -- large prime for hash distribution; 4999 was too small for a 6.2MB
+#                                corpus (>500K unique bigrams/trigrams possible), causing heavy hash
+#                                collisions that prevented N-gram tables from populating meaningfully.
+#                                50021 gives ~10x more slots, reducing collision rate substantially.
+#   EPOCHS = 3               -- W_K/W_V gating projections start near-zero (small init std=0.02).
+#                                A single epoch isn't enough for the gate to learn when N-gram memory
+#                                is useful vs. noise. 3 epochs gives the learned gates enough signal.
+#   Full corpus (dailydialog.txt, 6.2MB) -- variety matters for N-gram tables; the 1.18MB subset
+#                                had too few distinct conversation patterns to populate them well.
+NGRAM_TABLE_SIZE = 50021  # prime; ~10x larger than old 4999 to handle full 6.2MB corpus vocabulary
 SPECIAL_TOKENS = ["<START>", "<USER>", "<BOT>"]
 
 
