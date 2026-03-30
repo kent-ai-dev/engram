@@ -636,7 +636,13 @@ def main():
 
             ponder_cost = 0.01 * ponder_steps  # encourage efficiency
 
-            loss = mse_loss + ponder_cost
+            # Coherence penalty: ngram_memory and predicted should agree in direction.
+            # cos_sim in [-1, 1]; penalty = 1 - sim, so opposing vectors get penalized ~2,
+            # aligned vectors get ~0. Weight 0.05 keeps it subordinate to mse_loss.
+            cos_sim = F.cosine_similarity(predicted, ngram_memory, dim=-1).mean()
+            coherence_penalty = 0.05 * (1.0 - cos_sim)
+
+            loss = mse_loss + ponder_cost + coherence_penalty
 
             loss.backward()
 
