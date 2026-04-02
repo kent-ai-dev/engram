@@ -63,6 +63,10 @@ CHROMA_PATH = "./engram_memory"
 NGRAM_TABLE_SIZE = 50021  # prime; ~10x larger than old 4999 to handle full 6.2MB corpus vocabulary
 SPECIAL_TOKENS = ["<START>", "<USER>", "<BOT>"]
 
+# Device selection: use CUDA if available, else CPU
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"[engram] Using device: {DEVICE}")
+
 
 
 
@@ -161,16 +165,16 @@ class EngramModule(nn.Module):
         # Bigram: last two words
         if len(word_ids) >= 2:
             bh = self.hash_bigram(word_ids[-2], word_ids[-1])
-            bigram_emb = self.bigram_table(torch.tensor(bh))
+            bigram_emb = self.bigram_table(torch.tensor(bh, device=self.bigram_table.weight.device))
         else:
-            bigram_emb = torch.zeros(self.embed_dim // 2)
+            bigram_emb = torch.zeros(self.embed_dim // 2, device=self.bigram_table.weight.device)
 
         # Trigram: last three words
         if len(word_ids) >= 3:
             th = self.hash_trigram(word_ids[-3], word_ids[-2], word_ids[-1])
-            trigram_emb = self.trigram_table(torch.tensor(th))
+            trigram_emb = self.trigram_table(torch.tensor(th, device=self.trigram_table.weight.device))
         else:
-            trigram_emb = torch.zeros(self.embed_dim // 2)
+            trigram_emb = torch.zeros(self.embed_dim // 2, device=self.trigram_table.weight.device)
 
         return torch.cat([bigram_emb, trigram_emb], dim=-1)  # (embed_dim,)
 
@@ -239,7 +243,7 @@ class AttentionBrain(nn.Module):
 
         T = x.size(1)
 
-        positions = torch.arange(T, dtype=torch.long)
+        positions = torch.arange(T, dtype=torch.long, device=x.device)
 
         x = x + self.pos_embed(positions).unsqueeze(0)
 
@@ -247,7 +251,7 @@ class AttentionBrain(nn.Module):
 
         output = torch.zeros_like(x[:, -1, :])
 
-        remaining = torch.ones(x.size(0), 1)
+        remaining = torch.ones(x.size(0), 1, device=x.device)
 
         n_steps = 0
 
@@ -546,6 +550,8 @@ def main():
 
     brain = AttentionBrain()
     engram = EngramModule(EMBED_DIM)
+    brain.to(DEVICE)
+    engram.to(DEVICE)
     all_params = list(brain.parameters()) + list(engram.parameters())
     optimizer = optim.Adam(all_params, lr=BRAIN_LR)
     brain_params = sum(p.numel() for p in brain.parameters())
@@ -605,15 +611,15 @@ def main():
 
                 [embed_cache[w] for w in all_batch_words], dtype=torch.float32
 
-            ).requires_grad_(True)
+            ).to(DEVICE).requires_grad_(True)
 
 
 
             # (B, T) index tensors ??? (B, T, D) and (B, D)
 
-            ctx_idx = torch.tensor([[batch_idx[w] for w in cw] for cw in ctx_word_lists])
+            ctx_idx = torch.tensor([[batch_idx[w] for w in cw] for cw in ctx_word_lists]).to(DEVICE)
 
-            tgt_idx = torch.tensor([batch_idx[w] for w in target_words])
+            tgt_idx = torch.tensor([batch_idx[w] for w in target_words]).to(DEVICE)
 
 
 
@@ -720,6 +726,8 @@ def main():
 
 
 
+    brain.cpu()
+    engram.cpu()
     torch.save(brain.state_dict(), "engram_weights.pth")
     torch.save(engram.state_dict(), "engram_memory_module.pth")
     torch.save(word_to_id, "engram_word_to_id.pth")
