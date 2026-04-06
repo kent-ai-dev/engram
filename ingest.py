@@ -34,19 +34,19 @@ import random
 
 
 
-EMBED_DIM = 96
+EMBED_DIM = 256
 
 CONTEXT_SIZE = 32
 
-N_LAYERS = 4
+N_LAYERS = 8
 
-BATCH_SIZE = 256
+BATCH_SIZE = 128  # smaller batch for larger model (GPU memory)
 
-BRAIN_LR = 3e-3
+BRAIN_LR = 1e-3  # lower LR for deeper model — prevents gradient explosion
 
-EMBED_LR = 1e-3
+EMBED_LR = 5e-4  # lower embed LR too
 
-EPOCHS = 3  # 3 passes needed: learned gates require multiple epochs to discover when N-gram memory helps
+EPOCHS = 5  # 5 epochs: enough for 8-layer model to converge without overfitting
 
 CHROMA_PATH = "./engram_memory"
 

@@ -19,9 +19,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 # ── Constants ──────────────────────────────────────────────────────────────────
-EMBED_DIM = 96
-CONTEXT_SIZE = 12
-N_LAYERS = 4
+EMBED_DIM = 256
+CONTEXT_SIZE = 32
+N_LAYERS = 8
 TEMPERATURE = 0.9
 TOP_K = 10
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
