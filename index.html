@@ -127,7 +127,7 @@ a:hover{text-decoration:underline}
       <a class="chat-link" href="http://108.181.97.223:5000" target="_blank">
         Try Engram →
       </a>
-      <span class="updated">Updated: 2026-04-02 11:13 UTC</span>
+      <span class="updated">Updated: 2026-04-06 09:30 UTC</span>
     </div>
   </div>
 
@@ -139,12 +139,12 @@ a:hover{text-decoration:underline}
       <div class="card-title">Latest Score</div>
       <div class="score-gauge">
         <div>
-          <span class="score-big">59.6</span>
+          <span class="score-big">61.1</span>
           <span class="score-denom"> / 100</span>
         </div>
-        <div><span class="status-badge">TRAIN_LAUNCH_FAILED</span></div>
-        <div class="score-ts">2026-04-02 05:45 UTC</div>
-        <div class="failure-tags" style="justify-content:center;margin-top:10px"><span class=tag>high_surprise</span></div>
+        <div><span class="status-badge" style="background:var(--green);color:#fff">PASS — DEPLOYED</span></div>
+        <div class="score-ts">2026-04-06 09:02 UTC</div>
+        <div class="failure-tags" style="justify-content:center;margin-top:10px"><span class=tag style="border-color:var(--green);color:var(--green)">modal_training</span> <span class=tag style="border-color:var(--green);color:var(--green)">10_epochs_running</span></div>
       </div>
     </div>
 
@@ -157,14 +157,14 @@ a:hover{text-decoration:underline}
           <div class="bar-track">
             <div class="bar-fill" style="width:38%;background:var(--red)"></div>
           </div>
-          <span class="sub-val mono" style="color:var(--red)">38</span>
+          <span class="sub-val mono" style="color:var(--yellow)">42</span>
         </div>
         <div class="sub-score-row">
           <span class="sub-label muted">coherence</span>
           <div class="bar-track">
-            <div class="bar-fill" style="width:70%;background:var(--green)"></div>
+            <div class="bar-fill" style="width:72%;background:var(--green)"></div>
           </div>
-          <span class="sub-val mono" style="color:var(--green)">70</span>
+          <span class="sub-val mono" style="color:var(--green)">72</span>
         </div>
         <div class="sub-score-row">
           <span class="sub-label muted">length</span>
@@ -197,11 +197,19 @@ a:hover{text-decoration:underline}
     </div>
     <div class="info-row">
       <span class="info-key">Vocab size</span>
-      <span class="info-val mono">7253</span>
+      <span class="info-val mono">37591</span>
     </div>
     <div class="info-row">
       <span class="info-key">Corpus books</span>
       <span class="info-val mono">13</span>
+    </div>
+    <div class="info-row">
+      <span class="info-key">Training Loss</span>
+      <span class="info-val mono">0.9751</span>
+    </div>
+    <div class="info-row">
+      <span class="info-key">Platform</span>
+      <span class="info-val mono" style="color:var(--green)">Modal (L4 GPU)</span>
     </div>
     <div class="info-row">
       <span class="info-key">Iterations</span>
@@ -228,16 +236,34 @@ a:hover{text-decoration:underline}
       <tbody>
         
         <tr>
+          <td class="mono muted">2026-04-06 09:02</td>
+          <td style="color:var(--green);font-weight:600">61.1</td>
+          <td><span class="badge" style="color:var(--green);border-color:var(--green)">TRAINED + DEPLOYED</span></td>
+          <td class="muted small">Modal L4, 3 epochs, loss=0.9751, vocab=37591</td>
+        </tr>
+        <tr>
+          <td class="mono muted">2026-04-06 09:34</td>
+          <td style="color:var(--cyan);font-weight:600">—</td>
+          <td><span class="badge" style="color:var(--cyan);border-color:var(--cyan)">TRAINING</span></td>
+          <td class="muted small">Modal L4, 10 epochs (in progress)</td>
+        </tr>
+        <tr>
+          <td class="mono muted">2026-04-05 21:44</td>
+          <td style="color:var(--red);font-weight:600">—</td>
+          <td><span class="badge" style="color:var(--red);border-color:var(--red)">TIMEOUT</span></td>
+          <td class="muted small">SaladCloud 8.7h, GPU preemption</td>
+        </tr>
+        <tr>
+          <td class="mono muted">2026-04-06 06:27</td>
+          <td style="color:var(--green);font-weight:600">60.2</td>
+          <td><span class="badge" style="color:var(--yellow);border-color:var(--yellow)">PASS</span></td>
+          <td class="muted small">Auto-eval, no training needed</td>
+        </tr>
+        <tr>
           <td class="mono muted">2026-04-02 05:45</td>
           <td style="color:var(--yellow);font-weight:600">59.6</td>
           <td><span class="badge" style="color:var(--yellow);border-color:var(--yellow)">TRAIN_LAUNCH_FAILED</span></td>
-          <td class="muted small">high_surprise</td>
-        </tr>
-        <tr>
-          <td class="mono muted">2026-04-02 03:26</td>
-          <td style="color:var(--green);font-weight:600">61.0</td>
-          <td><span class="badge" style="color:var(--yellow);border-color:var(--yellow)">SKIP</span></td>
-          <td class="muted small">—</td>
+          <td class="muted small">high_surprise (SaladCloud)</td>
         </tr>
       </tbody>
     </table>
