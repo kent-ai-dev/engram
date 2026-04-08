@@ -71,17 +71,28 @@ print(f"[engram] Using device: {DEVICE}")
 
 
 
+N_HEADS = 8  # multi-head attention: 8 heads x 32-dim each for 256-dim model
+
+
 class AttentionBlock(nn.Module):
 
-    def __init__(self, embed_dim, context_size):
+    def __init__(self, embed_dim, context_size, n_heads=N_HEADS):
 
         super().__init__()
+
+        assert embed_dim % n_heads == 0, f"embed_dim {embed_dim} not divisible by n_heads {n_heads}"
+
+        self.n_heads = n_heads
+
+        self.head_dim = embed_dim // n_heads
 
         self.W_q = nn.Linear(embed_dim, embed_dim, bias=False)
 
         self.W_k = nn.Linear(embed_dim, embed_dim, bias=False)
 
         self.W_v = nn.Linear(embed_dim, embed_dim, bias=False)
+
+        self.W_o = nn.Linear(embed_dim, embed_dim, bias=False)
 
         self.ln1 = nn.LayerNorm(embed_dim)
 
@@ -107,19 +118,33 @@ class AttentionBlock(nn.Module):
 
         # x: (B, T, D)
 
-        T = x.size(1)
+        B, T, D = x.size()
 
         Q, K, V = self.W_q(x), self.W_k(x), self.W_v(x)
 
-        scale = x.size(-1) ** 0.5
+        # Reshape for multi-head: (B, T, D) -> (B, n_heads, T, head_dim)
+
+        Q = Q.view(B, T, self.n_heads, self.head_dim).transpose(1, 2)
+
+        K = K.view(B, T, self.n_heads, self.head_dim).transpose(1, 2)
+
+        V = V.view(B, T, self.n_heads, self.head_dim).transpose(1, 2)
+
+        scale = self.head_dim ** 0.5
 
         scores = torch.matmul(Q, K.transpose(-2, -1)) / scale
 
-        scores = scores.masked_fill(self.mask[:T, :T].unsqueeze(0) == 0, float("-inf"))
+        scores = scores.masked_fill(self.mask[:T, :T].unsqueeze(0).unsqueeze(0) == 0, float("-inf"))
 
         attn = F.softmax(scores, dim=-1)
 
-        x = self.ln1(x + torch.matmul(attn, V))
+        # (B, n_heads, T, head_dim) -> (B, T, D)
+
+        out = torch.matmul(attn, V).transpose(1, 2).contiguous().view(B, T, D)
+
+        out = self.W_o(out)
+
+        x = self.ln1(x + out)
 
         x = self.ln2(x + self.ff(x))
 
@@ -554,6 +579,9 @@ def main():
     engram.to(DEVICE)
     all_params = list(brain.parameters()) + list(engram.parameters())
     optimizer = optim.Adam(all_params, lr=BRAIN_LR)
+    # Cosine LR schedule: decay from BRAIN_LR to 1e-5 over training
+    total_steps = ((len(sequences) + BATCH_SIZE - 1) // BATCH_SIZE) * EPOCHS
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=total_steps, eta_min=1e-5)
     brain_params = sum(p.numel() for p in brain.parameters())
     engram_params = sum(p.numel() for p in engram.parameters())
     print(f"Brain parameters: {brain_params:,} | Engram memory: {engram_params:,} | Total: {brain_params + engram_params:,}")
@@ -640,7 +668,7 @@ def main():
 
             mse_loss = F.mse_loss(predicted, target_embeds)
 
-            ponder_cost = 0.01 * ponder_steps  # encourage efficiency
+            ponder_cost = 0.05 * ponder_steps  # encourage halt gate to stop early for easy tokens
 
             # Coherence penalty: ngram_memory and predicted should agree in direction.
             # cos_sim in [-1, 1]; penalty = 1 - sim, so opposing vectors get penalized ~2,
@@ -652,7 +680,11 @@ def main():
 
             loss.backward()
 
+            torch.nn.utils.clip_grad_norm_(all_params, 1.0)  # prevent gradient explosion across 24 effective passes
+
             optimizer.step()
+
+            scheduler.step()
 
 
 
