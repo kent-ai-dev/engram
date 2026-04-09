@@ -26,11 +26,12 @@ TEMPERATURE = 0.9
 TOP_K = 10
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Try models/baseline_iter2 first (has populated vocab), fall back to root
-_model_dir = os.path.join(BASE_DIR, "models", "baseline_iter2")
+# Deploy full large model: large_iter4 weights + vocab (baseline_iter2 is deprecated)
+_model_dir = os.path.join(BASE_DIR, "models", "large_iter4")
 if os.path.exists(os.path.join(_model_dir, "engram_weights.pth")):
-    CHROMA_PATH = os.path.join(_model_dir, "engram_memory")
     WEIGHTS_PATH = os.path.join(_model_dir, "engram_weights.pth")
+    # Use large_iter4's ChromaDB for both weights and vocab
+    CHROMA_PATH = os.path.join(BASE_DIR, "models", "large_iter4", "engram_memory")
 else:
     CHROMA_PATH = os.path.join(BASE_DIR, "engram_memory")
     WEIGHTS_PATH = os.path.join(BASE_DIR, "engram_weights.pth")
