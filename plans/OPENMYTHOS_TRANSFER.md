@@ -57,11 +57,11 @@ the implementation steps.
 
 ## Phase 0 — Harness + class unification + reproducibility gate
 
-**Status:** PENDING
+**Status:** IN_PROGRESS
 **Estimated:** 1 person-day
 **Blocks:** every other phase
 
-### 0.1 Unify model class
+### 0.1 Unify model class [x]
 
 **Problem:** `test_brain.py:17–112` defines a different model than
 `ingest.py:37–323`:
@@ -86,7 +86,7 @@ meaningless.
 **Pass criterion:** `test_brain.py` loads `engram_weights.pth` produced by
 `ingest.py` with zero state-dict warnings.
 
-### 0.2 Build `bench/run.py`
+### 0.2 Build `bench/run.py` [x]
 
 The single entry point for every test in this document. Reproducible JSON
 results land in `bench/history/<run_id>.json`.
