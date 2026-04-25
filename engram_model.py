@@ -1,3 +1,4 @@
+import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -139,6 +140,24 @@ class LTIInjection(nn.Module):
         return A * x + (1.0 - A) * (e + dt * delta)
 
 
+def loop_index_embedding(x: torch.Tensor, loop_idx: int, loop_dim: int = 32) -> torch.Tensor:
+    """Add sinusoidal loop-index signal to x.
+    Ported from OpenMythos open_mythos/main.py lines 541-570.
+    loop_dim channels encode which ponder iteration we're in; rest are zero.
+    """
+    B, T, D = x.shape
+    half = loop_dim // 2
+    div_term = torch.exp(
+        torch.arange(0, half, dtype=torch.float32, device=x.device)
+        * -(math.log(10000.0) / half)
+    )
+    t = torch.tensor(float(loop_idx), device=x.device)
+    emb = torch.zeros(D, device=x.device)
+    emb[:half] = torch.sin(t * div_term)
+    emb[half:loop_dim] = torch.cos(t * div_term)
+    return x + emb.unsqueeze(0).unsqueeze(0)
+
+
 class AttentionBrain(nn.Module):
     """Fixed-size reasoning engine — completely vocab-independent.
     Size is O(embed_dim^2 * n_layers). Does not grow as vocabulary grows.
@@ -146,7 +165,7 @@ class AttentionBrain(nn.Module):
     with a learned halt gate deciding when to stop.
     """
     def __init__(self, embed_dim=EMBED_DIM, context_size=CONTEXT_SIZE, n_layers=N_LAYERS,
-                 max_ponder=3, use_lti=False):
+                 max_ponder=3, use_lti=False, use_loop_idx=False):
         super().__init__()
         self.pos_embed = nn.Embedding(context_size, embed_dim)
         self.blocks = nn.ModuleList([AttentionBlock(embed_dim, context_size) for _ in range(n_layers)])
@@ -154,6 +173,8 @@ class AttentionBrain(nn.Module):
         self.halt_gate = nn.Linear(embed_dim, 1)
         self.max_ponder = max_ponder
         self.injection = LTIInjection(embed_dim) if use_lti else None
+        self.use_loop_idx = use_loop_idx
+        self.loop_dim = embed_dim // 8  # 32 for embed_dim=256
 
     def forward(self, x, ngram_memory=None, engram_module=None):
         # x: (B, T, D) — raw concept vectors from ChromaDB
@@ -170,6 +191,9 @@ class AttentionBrain(nn.Module):
         n_steps = 0
 
         for ponder_idx in range(self.max_ponder):
+            if self.use_loop_idx:
+                x = loop_index_embedding(x, ponder_idx, self.loop_dim)
+
             x_before = x
             for block_idx, block in enumerate(self.blocks):
                 x = block(x)

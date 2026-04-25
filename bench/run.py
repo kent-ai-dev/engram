@@ -224,6 +224,7 @@ def train(args) -> dict:
         n_layers=N_LAYERS,
         max_ponder=args.n_ponder_train,
         use_lti=args.use_lti,
+        use_loop_idx=args.use_loop_idx,
     )
     engram = EngramModule(EMBED_DIM)
     brain.to(device)

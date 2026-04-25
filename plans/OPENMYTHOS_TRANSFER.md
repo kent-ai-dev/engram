@@ -142,7 +142,7 @@ is the fixed comparison point for every later phase.
 
 ## Phase 1 — LTI-stable input injection
 
-**Status:** PENDING
+**Status:** KILLED
 **Pre-req:** Phase 0 complete
 **Reference:** `OpenMythos:open_mythos/main.py:684–742` (`LTIInjection`),
 call site line 863.
@@ -170,15 +170,15 @@ call site line 863.
 
 ### 1.3 Tests
 
-| ID | Setup | Pass | Kill |
-|---|---|---|---|
-| **1-A** Smoke | 200 steps on 1k sequences | Loss not NaN; `injection.get_A()` ∈ (0,1) every step | NaN, A out of range |
-| **1-B** Reproducibility | Re-run 1-A, seed 42 | Loss curves identical to 1e-5 | Nondeterminism |
-| **1-C** Stability (H1) | Full bench at current LR | `grad_norm_p99` ≤ 0.7× baseline | < 30% reduction |
-| **1-D** Quality at iso-FLOP (H2) | Full bench | `eval_cosine_top1` ≥ baseline + 1.5pp **and** `eval_cosine_mean` ≥ baseline | Equal or worse |
-| **1-E** LR robustness (H3) | LTI@2e-3 vs baseline@2e-3 (control) | LTI trains stably; baseline NaNs or `grad_norm_p99` doubles | LTI also unstable |
+| ID | Setup | Pass | Kill | Result |
+|---|---|---|---|---|
+| **1-A** Smoke | 200 steps on 1k sequences | Loss not NaN; `injection.get_A()` ∈ (0,1) every step | NaN, A out of range | [x] PASS |
+| **1-B** Reproducibility | Re-run 1-A, seed 42 | Loss curves identical to 1e-5 | Nondeterminism | [x] PASS |
+| **1-C** Stability (H1) | Full bench at current LR | `grad_norm_p99` ≤ 0.3927 | < 30% reduction | [x] FAIL — got 0.5724 vs 0.5610 baseline |
+| **1-D** Quality at iso-FLOP (H2) | Full bench | `eval_cosine_top1` ≥ 6.5% | Equal or worse | [x] FAIL — got 5.0% (unchanged) |
+| **1-E** LR robustness (H3) | LTI@2e-3 vs baseline@2e-3 (control) | LTI trains stably; baseline NaNs or `grad_norm_p99` doubles | LTI also unstable | skipped (1-C+1-D both fail) |
 
-**Decision rule:** Keep iff **1-C OR 1-D passes**.
+**Decision rule:** Keep iff **1-C OR 1-D passes**. → **KILLED** — neither passed.
 
 ### 1.4 Failure-mode watch
 
@@ -192,7 +192,7 @@ at our scale.
 ## Phase 2 — Loop-index sinusoidal embedding
 
 **Status:** PENDING
-**Pre-req:** Phase 1 merged
+**Pre-req:** Phase 1 merged _(Phase 1 killed; Phase 2 runs against baseline — loop-idx is LTI-independent)_
 **Reference:** `OpenMythos:open_mythos/main.py:541–570`,
 call site line 858.
 

@@ -1,0 +1,45 @@
+{
+  "run_id": "phase1_1b_repro",
+  "timestamp": "2026-04-25T21:33:41.244727+00:00",
+  "seed": 42,
+  "config": {
+    "corpus": [
+      "corpus/dailydialog_tiny.txt",
+      "corpus/11_alice_s_adventures_in_wonderland.txt"
+    ],
+    "holdout": [
+      "corpus/35_the_time_machine.txt"
+    ],
+    "epochs": 1,
+    "batch_size": 128,
+    "context_size": 32,
+    "n_ponder_train": 3,
+    "n_ponder_eval": 3,
+    "max_sequences": null,
+    "use_lti": true,
+    "use_loop_idx": false,
+    "use_lora": false,
+    "use_rope": false
+  },
+  "param_count": 19255554,
+  "flops_per_token": 786432,
+  "train_loss_curve": [
+    2.223925,
+    1.768404,
+    1.548366,
+    1.379512,
+    1.333957,
+    1.294566,
+    1.287193
+  ],
+  "grad_norm_p50": 0.530275,
+  "grad_norm_p99": 0.593486,
+  "ponder_steps_hist": {
+    "3": 664
+  },
+  "wall_time_train": 154.79,
+  "wall_time_eval": 4.94,
+  "eval_cosine_top1": 5.0,
+  "eval_cosine_mean": 0.044967705093324185,
+  "eval_perp_proxy": 7.291137590408325
+}
