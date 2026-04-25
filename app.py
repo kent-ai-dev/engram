@@ -12,126 +12,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 import gradio as gr
 
+from engram_model import AttentionBrain, EngramModule
+
 # ── Constants ─────────────────────────────────────────────────────────────────
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPERATURE = 0.9
 TOP_K = 10
 GEN_STEPS = 20
-NGRAM_TABLE_SIZE = 4999
-
-# ── Model Architecture ───────────────────────────────────────────────────────
-
-
-class AttentionBlock(nn.Module):
-    def __init__(self, embed_dim, context_size):
-        super().__init__()
-        self.W_q = nn.Linear(embed_dim, embed_dim, bias=False)
-        self.W_k = nn.Linear(embed_dim, embed_dim, bias=False)
-        self.W_v = nn.Linear(embed_dim, embed_dim, bias=False)
-        self.ln1 = nn.LayerNorm(embed_dim)
-        self.ff = nn.Sequential(
-            nn.Linear(embed_dim, embed_dim * 4),
-            nn.GELU(),
-            nn.Linear(embed_dim * 4, embed_dim),
-        )
-        self.ln2 = nn.LayerNorm(embed_dim)
-        mask = torch.tril(torch.ones(context_size, context_size))
-        self.register_buffer("mask", mask)
-
-    def forward(self, x):
-        T = x.size(1)
-        Q, K, V = self.W_q(x), self.W_k(x), self.W_v(x)
-        scale = x.size(-1) ** 0.5
-        scores = torch.matmul(Q, K.transpose(-2, -1)) / scale
-        scores = scores.masked_fill(
-            self.mask[:T, :T].unsqueeze(0) == 0, float("-inf")
-        )
-        attn = F.softmax(scores, dim=-1)
-        x = self.ln1(x + torch.matmul(attn, V))
-        x = self.ln2(x + self.ff(x))
-        return x
-
-
-class EngramModule(nn.Module):
-    """N-gram embedding tables with learned gating."""
-    HASH_PRIME = 31
-
-    def __init__(self, embed_dim, table_size=NGRAM_TABLE_SIZE):
-        super().__init__()
-        half_dim = embed_dim // 2
-        self.embed_dim = embed_dim
-        self.table_size = table_size
-        self.bigram_table = nn.Embedding(table_size, half_dim)
-        self.trigram_table = nn.Embedding(table_size, half_dim)
-        self.W_K = nn.Linear(embed_dim, embed_dim, bias=False)
-        self.W_V = nn.Linear(embed_dim, embed_dim, bias=False)
-        nn.init.normal_(self.bigram_table.weight, std=0.02)
-        nn.init.normal_(self.trigram_table.weight, std=0.02)
-
-    def hash_bigram(self, id1, id2):
-        return ((id1 * self.HASH_PRIME) ^ id2) % self.table_size
-
-    def hash_trigram(self, id1, id2, id3):
-        return (((id1 * self.HASH_PRIME) ^ id2) * self.HASH_PRIME ^ id3) % self.table_size
-
-    def lookup(self, word_ids):
-        if len(word_ids) >= 2:
-            bh = self.hash_bigram(word_ids[-2], word_ids[-1])
-            bigram_emb = self.bigram_table(torch.tensor(bh))
-        else:
-            bigram_emb = torch.zeros(self.embed_dim // 2)
-        if len(word_ids) >= 3:
-            th = self.hash_trigram(word_ids[-3], word_ids[-2], word_ids[-1])
-            trigram_emb = self.trigram_table(torch.tensor(th))
-        else:
-            trigram_emb = torch.zeros(self.embed_dim // 2)
-        return torch.cat([bigram_emb, trigram_emb], dim=-1)
-
-    def gate(self, hidden_state, memory_vector):
-        k = self.W_K(memory_vector)
-        v = self.W_V(memory_vector)
-        alpha = torch.sigmoid(
-            (F.normalize(hidden_state, dim=-1) * F.normalize(k, dim=-1)).sum(-1, keepdim=True)
-            / (hidden_state.size(-1) ** 0.5)
-        )
-        return alpha * v
-
-
-class AttentionBrain(nn.Module):
-    def __init__(self, embed_dim, context_size, n_layers, max_ponder=3):
-        super().__init__()
-        self.pos_embed = nn.Embedding(context_size, embed_dim)
-        self.blocks = nn.ModuleList(
-            [AttentionBlock(embed_dim, context_size) for _ in range(n_layers)]
-        )
-        self.ln_final = nn.LayerNorm(embed_dim)
-        self.halt_gate = nn.Linear(embed_dim, 1)
-        self.max_ponder = max_ponder
-
-    def forward(self, x, ngram_memory=None, engram_module=None):
-        T = x.size(1)
-        positions = torch.arange(T, dtype=torch.long)
-        x = x + self.pos_embed(positions).unsqueeze(0)
-
-        output = torch.zeros_like(x[:, -1, :])
-        remaining = torch.ones(x.size(0), 1)
-
-        for _ in range(self.max_ponder):
-            for block_idx, block in enumerate(self.blocks):
-                x = block(x)
-                if block_idx == 0 and ngram_memory is not None and engram_module is not None:
-                    gated_mem = engram_module.gate(x[:, -1, :], ngram_memory)
-                    x = x.clone()
-                    x[:, -1, :] = x[:, -1, :] + gated_mem
-            last_token = x[:, -1, :]
-            halt_prob = torch.sigmoid(self.halt_gate(last_token))
-            output = output + remaining * last_token
-            remaining = remaining * (1 - halt_prob)
-            if not self.training and remaining.max().item() < 0.05:
-                break
-
-        output = output + remaining * last_token
-        return self.ln_final(output)
 
 
 # ── Inference ─────────────────────────────────────────────────────────────────
@@ -177,9 +64,9 @@ def generate_response(brain, word_list, vocab_matrix, word_to_idx, prompt_words,
                 ids = [word_to_id.get(w, 0) for w in ctx_words]
                 ngram_memory = engram_module.lookup(ids).unsqueeze(0)
 
-            predicted = brain(ctx_stack.unsqueeze(0),
-                              ngram_memory=ngram_memory,
-                              engram_module=engram_module)
+            predicted, _ = brain(ctx_stack.unsqueeze(0),
+                                 ngram_memory=ngram_memory,
+                                 engram_module=engram_module)
             predicted = predicted.squeeze(0)
 
         penalty = {w: 3.0 for w in set(recent[-4:])}
@@ -234,8 +121,10 @@ def load_engram():
     context_size = state_dict["pos_embed.weight"].shape[0]
     n_layers = max(int(k.split(".")[1]) for k in state_dict if k.startswith("blocks.")) + 1
 
-    brain = AttentionBrain(embed_dim=embed_dim, context_size=context_size, n_layers=n_layers)
-    brain.load_state_dict(state_dict)
+    # Detect RoPE checkpoints by presence of freqs_cis buffers
+    use_rope = any(k.startswith("blocks.") and k.endswith(".freqs_cis") for k in state_dict)
+    brain = AttentionBrain(embed_dim=embed_dim, context_size=context_size, n_layers=n_layers, use_rope=use_rope)
+    brain.load_state_dict(state_dict, strict=False)
     brain.eval()
 
     # Load EngramModule if available
