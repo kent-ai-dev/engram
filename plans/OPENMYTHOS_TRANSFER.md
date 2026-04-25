@@ -57,7 +57,7 @@ the implementation steps.
 
 ## Phase 0 — Harness + class unification + reproducibility gate
 
-**Status:** IN_PROGRESS
+**Status:** PASSED
 **Estimated:** 1 person-day
 **Blocks:** every other phase
 
@@ -117,7 +117,7 @@ results land in `bench/history/<run_id>.json`.
 9. `flops_per_token` (analytical: layers × dim × n_ponder × seq_len)
 10. `config` — full feature flag echo
 
-### 0.3 Reproducibility gate
+### 0.3 Reproducibility gate [x]
 
 **Test:** Run `bench/run.py --seed 42` twice with identical config.
 
@@ -133,7 +133,7 @@ results land in `bench/history/<run_id>.json`.
 **If 0.3 fails, halt. No phase 1+ work is meaningful until reproducibility
 holds.**
 
-### 0.4 Baseline run
+### 0.4 Baseline run [x]
 
 Lock in numbers for the current `main` branch. `bench/history/baseline.json`
 is the fixed comparison point for every later phase.
