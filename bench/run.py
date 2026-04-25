@@ -223,6 +223,7 @@ def train(args) -> dict:
         context_size=args.context_size,
         n_layers=N_LAYERS,
         max_ponder=args.n_ponder_train,
+        use_lti=args.use_lti,
     )
     engram = EngramModule(EMBED_DIM)
     brain.to(device)

@@ -111,19 +111,49 @@ class EngramModule(nn.Module):
         return alpha * v
 
 
+class LTIInjection(nn.Module):
+    """LTI-stable input injection — re-anchors the residual stream to the
+    original input every ponder iteration, preventing drift across loop depth.
+
+    Diagonal form: one log_A per channel, one scalar log_dt.
+    A = exp(-exp(log_A)) is always in (0, 1).
+    x_new = A * x + (1 - A) * (e + dt * delta)
+
+    Ported from OpenMythos open_mythos/main.py lines 684-742.
+    Init: log_A = -2.0 → A ≈ 0.87 (near identity, avoids A collapsing to ~0).
+    """
+    def __init__(self, embed_dim: int):
+        super().__init__()
+        self.log_A = nn.Parameter(torch.full((embed_dim,), -2.0))
+        self.log_dt = nn.Parameter(torch.zeros(1))
+
+    def get_A(self) -> torch.Tensor:
+        return torch.exp(-torch.exp(self.log_A))
+
+    def forward(self, x: torch.Tensor, e: torch.Tensor, delta: torch.Tensor) -> torch.Tensor:
+        # x: current hidden state (B, T, D)
+        # e: original pos-embedded input frozen before ponder loop (B, T, D)
+        # delta: blocks(x_before) - x_before, the transformer residual (B, T, D)
+        A = self.get_A()                    # (D,)
+        dt = torch.exp(self.log_dt)         # scalar > 0
+        return A * x + (1.0 - A) * (e + dt * delta)
+
+
 class AttentionBrain(nn.Module):
     """Fixed-size reasoning engine — completely vocab-independent.
     Size is O(embed_dim^2 * n_layers). Does not grow as vocabulary grows.
     Includes adaptive pondering: loops through blocks up to max_ponder times,
     with a learned halt gate deciding when to stop.
     """
-    def __init__(self, embed_dim=EMBED_DIM, context_size=CONTEXT_SIZE, n_layers=N_LAYERS, max_ponder=3):
+    def __init__(self, embed_dim=EMBED_DIM, context_size=CONTEXT_SIZE, n_layers=N_LAYERS,
+                 max_ponder=3, use_lti=False):
         super().__init__()
         self.pos_embed = nn.Embedding(context_size, embed_dim)
         self.blocks = nn.ModuleList([AttentionBlock(embed_dim, context_size) for _ in range(n_layers)])
         self.ln_final = nn.LayerNorm(embed_dim)
         self.halt_gate = nn.Linear(embed_dim, 1)
         self.max_ponder = max_ponder
+        self.injection = LTIInjection(embed_dim) if use_lti else None
 
     def forward(self, x, ngram_memory=None, engram_module=None):
         # x: (B, T, D) — raw concept vectors from ChromaDB
@@ -132,17 +162,26 @@ class AttentionBrain(nn.Module):
         positions = torch.arange(T, dtype=torch.long, device=x.device)
         x = x + self.pos_embed(positions).unsqueeze(0)
 
+        # Freeze input after positional embedding for LTI re-anchoring
+        e = x if self.injection is not None else None
+
         output = torch.zeros_like(x[:, -1, :])
         remaining = torch.ones(x.size(0), 1, device=x.device)
         n_steps = 0
 
         for ponder_idx in range(self.max_ponder):
+            x_before = x
             for block_idx, block in enumerate(self.blocks):
                 x = block(x)
                 if block_idx == 0 and ngram_memory is not None and engram_module is not None:
                     gated_mem = engram_module.gate(x[:, -1, :], ngram_memory)
                     x = x.clone()
                     x[:, -1, :] = x[:, -1, :] + gated_mem
+
+            if self.injection is not None:
+                delta = x - x_before
+                x = self.injection(x, e, delta)
+
             last_token = x[:, -1, :]
             halt_prob = torch.sigmoid(self.halt_gate(last_token))
 
