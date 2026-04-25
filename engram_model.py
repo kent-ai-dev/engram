@@ -195,7 +195,7 @@ class AttentionBrain(nn.Module):
     with a learned halt gate deciding when to stop.
     """
     def __init__(self, embed_dim=EMBED_DIM, context_size=CONTEXT_SIZE, n_layers=N_LAYERS,
-                 max_ponder=3, use_lti=False, use_loop_idx=False, use_rope=False):
+                 max_ponder=3, use_lti=False, use_loop_idx=False, use_rope=True):
         super().__init__()
         self.pos_embed = nn.Embedding(context_size, embed_dim)
         self.use_rope = use_rope

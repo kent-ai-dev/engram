@@ -46,8 +46,9 @@ Based on the insight from *"Conditional Memory via Scalable Lookup"* (Cheng et a
 This is functionally equivalent to doubling the model's effective depth — Layer 5 with memory matches Layer 12 without it (per the paper's benchmarks).
 
 **PyTorch brain** (`AttentionBrain`):
-- ~137k parameters — fixed size regardless of vocabulary
-- 4 stacked attention layers with causal masking
+- ~19.3M parameters — fixed size regardless of vocabulary
+- 8 stacked multi-head attention layers (8 heads, 256-dim) with causal masking
+- **RoPE positional encoding** — replaces learned `pos_embed`; enables test-time context extension (verified stable at 3× training context, zero quality cliff)
 - **Adaptive pondering**: loops through layers up to 3 times with learned halt gate
 - **Allocates more compute to difficult inputs** (like PonderNet/TRM)
 - Knows HOW to think in concept space, not WHAT words mean
@@ -112,13 +113,16 @@ uv run test_brain.py
 
 ## Tuning knobs
 
-In `ingest.py`:
-- `EMBED_DIM` (default 96): embedding size — higher = more capacity, slower training
-- `CONTEXT_SIZE` (default 32): how many past words to attend over
-- `N_LAYERS` (default 4): attention block depth
-- `EPOCHS` (default 1): training passes — increase for better convergence
-- `NGRAM_TABLE_SIZE` (default 4999): size of bigram/trigram hash tables (prime number)
+In `engram_model.py` (architecture constants):
+- `EMBED_DIM` (default 256): embedding size — higher = more capacity, slower training
+- `CONTEXT_SIZE` (default 32): training context window; RoPE supports eval at any length
+- `N_LAYERS` (default 8): attention block depth
+- `N_HEADS` (default 8): attention heads per block
+- `NGRAM_TABLE_SIZE` (default 50021): size of bigram/trigram hash tables (prime number)
 - `max_ponder` in `AttentionBrain` (default 3): maximum pondering loops
+
+In `ingest.py` (training constants):
+- `EPOCHS` (default 5): training passes — increase for better convergence
 
 In `test_brain.py`:
 - `TEMPERATURE` (default 0.9): higher = more creative/random, lower = more conservative
@@ -128,21 +132,24 @@ In `test_brain.py`:
 
 ## Evolution roadmap
 
-| Capability | Status | What it enables |
-|------------|--------|-----------------|
-| Adaptive pondering | ✅ Working | Variable compute allocation (1-3 reasoning loops) |
-| Surprise-gated learning | ✅ Working | Up to 3x gradient for novel inputs |
-| Episodic memory | ✅ Working | Persistent memory of specific interactions |
-| Conditional memory (N-gram) | ✅ Working | Hash-indexed phrase-level pattern lookup |
-| Learned gating | ✅ Working | Context-aware memory blending (replaces fixed ratio) |
-| Between-layer injection | ✅ Working | Memory frees later layers for reasoning |
-| Q&A auto-detection | ✅ Working | Learns conversational turn-taking automatically |
-| Paragraph boundaries | ✅ Working | No cross-topic garbage transitions |
-| Normalized embeddings | ✅ Working | Semantic similarity (not magnitude-based) |
-| Context window + attention | ✅ Working | 32-word memory span |
-| Diverse word generation | ✅ Working | Temperature + top-k sampling |
-| Coherent short phrases | Partial | More training data (10k+ words) |
-| Long-range coherence | Not yet | Larger model, more data, more epochs |
+| Capability | Status | Measured delta | What it enables |
+|------------|--------|----------------|-----------------|
+| Adaptive pondering | ✅ Working | — | Variable compute allocation (1-3 reasoning loops) |
+| Surprise-gated learning | ✅ Working | — | Up to 3x gradient for novel inputs |
+| Episodic memory | ✅ Working | — | Persistent memory of specific interactions |
+| Conditional memory (N-gram) | ✅ Working | — | Hash-indexed phrase-level pattern lookup |
+| Learned gating | ✅ Working | — | Context-aware memory blending (replaces fixed ratio) |
+| Between-layer injection | ✅ Working | — | Memory frees later layers for reasoning |
+| Q&A auto-detection | ✅ Working | — | Learns conversational turn-taking automatically |
+| Paragraph boundaries | ✅ Working | — | No cross-topic garbage transitions |
+| Normalized embeddings | ✅ Working | — | Semantic similarity (not magnitude-based) |
+| RoPE positional encoding | ✅ Working | grad_norm_p99 −50% (0.561→0.280); 5.0% top1 at 3× ctx | Stable training + test-time context extension |
+| Context window + attention | ✅ Working | — | 32-word training span; ≥96 at eval |
+| Diverse word generation | ✅ Working | — | Temperature + top-k sampling |
+| Coherent short phrases | Partial | — | More training data (10k+ words) |
+| Long-range coherence | Partial | — | RoPE supports it; need larger corpus to see gains |
+| LTI injection (tested) | ❌ No gain | Δgrad_norm_p99=+0.011; Δtop1=0.0pp | Drift prevention — did not help at 19M param scale |
+| Loop-index embedding (tested) | ❌ No gain | halt gate insensitive, Δtop1=0.0pp | Ponder-depth differentiation — halt gate never fires early |
 
 **Key features**:
 - Training separates paragraphs (blank lines) to avoid cross-topic noise

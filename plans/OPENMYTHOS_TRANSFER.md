@@ -328,7 +328,7 @@ smaller context — 10k may suffice and extrapolate further. Try both.
 
 ## Phase 6 — Lock and document
 
-**Status:** PENDING
+**Status:** PASSED
 **Pre-req:** Phases 1–5 resolved
 **Manual checkpoint — requires human review**
 
