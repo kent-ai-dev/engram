@@ -191,8 +191,8 @@ at our scale.
 
 ## Phase 2 — Loop-index sinusoidal embedding
 
-**Status:** PENDING
-**Pre-req:** Phase 1 merged _(Phase 1 killed; Phase 2 runs against baseline — loop-idx is LTI-independent)_
+**Status:** KILLED
+**Pre-req:** Phase 1 merged _(Phase 1 killed; Phase 2 ran against baseline — loop-idx is LTI-independent)_
 **Reference:** `OpenMythos:open_mythos/main.py:541–570`,
 call site line 858.
 
@@ -211,13 +211,13 @@ and the FFN behave differently at different depths.
 
 ### 2.3 Tests
 
-| ID | Setup | Pass | Kill |
-|---|---|---|---|
-| **2-A** Halt distribution shifts | Bench vs LTI-only baseline | `entropy(ponder_steps_hist) > prev + 0.1 nats` OR mean halt drops ≥0.2 with no eval regression | Identical halt distribution |
-| **2-B** Quality | Bench run | `eval_cosine_top1` ≥ Phase-1 result + 0.5pp | Worse than Phase 1 |
-| **2-C** Channel sensitivity | `loop_dim ∈ {16, 32, 64}` | At least one config beats Phase 1 on 2-B | None beat |
+| ID | Setup | Pass | Kill | Result |
+|---|---|---|---|---|
+| **2-A** Halt distribution shifts | Bench vs LTI-only baseline | `entropy(ponder_steps_hist) > prev + 0.1 nats` OR mean halt drops ≥0.2 with no eval regression | Identical halt distribution | [x] FAIL — {"3": 1328}, entropy 0 nats, Δ=0 |
+| **2-B** Quality | Bench run | `eval_cosine_top1` ≥ 5.5% | Worse than baseline | [x] FAIL — 5.0% (unchanged) |
+| **2-C** Channel sensitivity | `loop_dim ∈ {16, 32, 64}` | At least one config beats baseline on 2-B | None beat | skipped (2-A fails decision rule) |
 
-**Decision rule:** Keep iff 2-A passes AND 2-B does not regress.
+**Decision rule:** Keep iff 2-A passes AND 2-B does not regress. → **KILLED** — halt gate shows zero sensitivity to loop-index signal.
 
 ---
 
@@ -287,7 +287,7 @@ Per-loop LoRA shifts what it *does*. Combined > either alone.
 
 ## Phase 5 — RoPE replacing learned positional embedding
 
-**Status:** PENDING
+**Status:** IN PROGRESS
 **Pre-req:** Phase 0 only (independent track)
 **Reference:** `OpenMythos:open_mythos/main.py:124–169` (RoPE prims),
 call sites lines 236–237.

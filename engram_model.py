@@ -11,8 +11,29 @@ NGRAM_TABLE_SIZE = 50021
 SPECIAL_TOKENS = ["<START>", "<USER>", "<BOT>"]
 
 
+def precompute_rope_freqs(head_dim: int, max_seq_len: int, theta: float = 10000.0, device=None) -> torch.Tensor:
+    """Precompute complex RoPE frequencies. Returns (max_seq_len, head_dim // 2) complex64.
+    Ported from OpenMythos open_mythos/main.py lines 124-169.
+    """
+    freqs = 1.0 / (theta ** (torch.arange(0, head_dim, 2, dtype=torch.float32, device=device) / head_dim))
+    t = torch.arange(max_seq_len, dtype=torch.float32, device=device)
+    freqs_2d = torch.outer(t, freqs)            # (max_seq_len, head_dim // 2)
+    return torch.polar(torch.ones_like(freqs_2d), freqs_2d)  # complex64
+
+
+def apply_rope(x: torch.Tensor, freqs_cis: torch.Tensor) -> torch.Tensor:
+    """Apply rotary positional embedding to Q or K.
+    x: (B, n_heads, T, head_dim)
+    freqs_cis: (max_seq_len, head_dim // 2) complex64
+    """
+    B, H, T, D = x.shape
+    x_c = torch.view_as_complex(x.float().reshape(B, H, T, D // 2, 2))
+    fc = freqs_cis[:T].unsqueeze(0).unsqueeze(0)   # (1, 1, T, D//2)
+    return torch.view_as_real(x_c * fc).reshape(B, H, T, D).to(x.dtype)
+
+
 class AttentionBlock(nn.Module):
-    def __init__(self, embed_dim, context_size, n_heads=N_HEADS):
+    def __init__(self, embed_dim, context_size, n_heads=N_HEADS, use_rope=False):
         super().__init__()
         assert embed_dim % n_heads == 0, f"embed_dim {embed_dim} not divisible by n_heads {n_heads}"
         self.n_heads = n_heads
@@ -30,6 +51,10 @@ class AttentionBlock(nn.Module):
         self.ln2 = nn.LayerNorm(embed_dim)
         mask = torch.tril(torch.ones(context_size, context_size))
         self.register_buffer("mask", mask)
+        self.use_rope = use_rope
+        if use_rope:
+            freqs_cis = precompute_rope_freqs(self.head_dim, context_size)
+            self.register_buffer("freqs_cis", freqs_cis)
 
     def forward(self, x):
         B, T, D = x.size()
@@ -37,6 +62,9 @@ class AttentionBlock(nn.Module):
         Q = Q.view(B, T, self.n_heads, self.head_dim).transpose(1, 2)
         K = K.view(B, T, self.n_heads, self.head_dim).transpose(1, 2)
         V = V.view(B, T, self.n_heads, self.head_dim).transpose(1, 2)
+        if self.use_rope:
+            Q = apply_rope(Q, self.freqs_cis)
+            K = apply_rope(K, self.freqs_cis)
         scale = self.head_dim ** 0.5
         scores = torch.matmul(Q, K.transpose(-2, -1)) / scale
         scores = scores.masked_fill(self.mask[:T, :T].unsqueeze(0).unsqueeze(0) == 0, float("-inf"))
@@ -165,10 +193,13 @@ class AttentionBrain(nn.Module):
     with a learned halt gate deciding when to stop.
     """
     def __init__(self, embed_dim=EMBED_DIM, context_size=CONTEXT_SIZE, n_layers=N_LAYERS,
-                 max_ponder=3, use_lti=False, use_loop_idx=False):
+                 max_ponder=3, use_lti=False, use_loop_idx=False, use_rope=False):
         super().__init__()
         self.pos_embed = nn.Embedding(context_size, embed_dim)
-        self.blocks = nn.ModuleList([AttentionBlock(embed_dim, context_size) for _ in range(n_layers)])
+        self.use_rope = use_rope
+        self.blocks = nn.ModuleList([
+            AttentionBlock(embed_dim, context_size, use_rope=use_rope) for _ in range(n_layers)
+        ])
         self.ln_final = nn.LayerNorm(embed_dim)
         self.halt_gate = nn.Linear(embed_dim, 1)
         self.max_ponder = max_ponder
@@ -180,8 +211,9 @@ class AttentionBrain(nn.Module):
         # x: (B, T, D) — raw concept vectors from ChromaDB
         # Returns: (prediction, n_steps) where prediction is (B, D)
         T = x.size(1)
-        positions = torch.arange(T, dtype=torch.long, device=x.device)
-        x = x + self.pos_embed(positions).unsqueeze(0)
+        if not self.use_rope:
+            positions = torch.arange(T, dtype=torch.long, device=x.device)
+            x = x + self.pos_embed(positions).unsqueeze(0)
 
         # Freeze input after positional embedding for LTI re-anchoring
         e = x if self.injection is not None else None
