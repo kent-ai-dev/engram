@@ -126,11 +126,12 @@ def eval_holdout(brain: AttentionBrain, embed_cache: dict, holdout_text: str,
     Returns dict with eval_cosine_top1, eval_cosine_mean, eval_perp_proxy.
     """
     brain.eval()
+    device = next(brain.parameters()).device
     sequences = build_sequences(holdout_text, context_size)
     if not sequences:
         return {"eval_cosine_top1": 0.0, "eval_cosine_mean": 0.0, "eval_perp_proxy": 0.0}
 
-    # Build vocab matrix from embed_cache for fast lookup
+    # Build vocab matrix on CPU for similarity lookup (move pred to CPU for comparison)
     word_list = list(embed_cache.keys())
     word_to_idx = {w: i for i, w in enumerate(word_list)}
     vocab_matrix = torch.tensor([embed_cache[w] for w in word_list], dtype=torch.float32)
@@ -156,11 +157,11 @@ def eval_holdout(brain: AttentionBrain, embed_cache: dict, holdout_text: str,
                 torch.tensor(embed_cache.get(w, [0.0] * EMBED_DIM), dtype=torch.float32)
                 for w in ctx_words
             ]
-            ctx_stack = torch.stack(ctx_tensors).unsqueeze(0)
+            ctx_stack = torch.stack(ctx_tensors).unsqueeze(0).to(device)
             predicted, _ = brain(ctx_stack)
-            pred_norm = F.normalize(predicted.squeeze(0), dim=0)
+            pred_norm = F.normalize(predicted.squeeze(0).cpu(), dim=0)
 
-            # Cosine similarities against all vocab
+            # Cosine similarities against all vocab (both on CPU)
             sims = (vocab_norm * pred_norm.unsqueeze(0)).sum(-1)
 
             # Top-1 accuracy
