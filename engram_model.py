@@ -49,11 +49,13 @@ class AttentionBlock(nn.Module):
             nn.Linear(embed_dim * 4, embed_dim),
         )
         self.ln2 = nn.LayerNorm(embed_dim)
-        mask = torch.tril(torch.ones(context_size, context_size))
+        # Precompute at 4× context_size when RoPE is on to allow inference-time extrapolation.
+        max_len = context_size * 4 if use_rope else context_size
+        mask = torch.tril(torch.ones(max_len, max_len))
         self.register_buffer("mask", mask)
         self.use_rope = use_rope
         if use_rope:
-            freqs_cis = precompute_rope_freqs(self.head_dim, context_size)
+            freqs_cis = precompute_rope_freqs(self.head_dim, max_len)
             self.register_buffer("freqs_cis", freqs_cis)
 
     def forward(self, x):

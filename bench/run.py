@@ -323,6 +323,13 @@ def train(args) -> dict:
     t_eval_start = time.time()
     n_ponder_eval = args.n_ponder_eval if args.n_ponder_eval is not None else args.n_ponder_train
     eval_metrics = eval_holdout(brain, embed_cache, holdout_text, args.context_size, n_ponder_eval, chroma_path="./engram_memory")
+
+    # RoPE extrapolation eval: test longer contexts than training (Phase 5-B)
+    extrap_results = {}
+    if args.use_rope:
+        for extrap_ctx in [args.context_size * 2, args.context_size * 3]:
+            em = eval_holdout(brain, embed_cache, holdout_text, extrap_ctx, n_ponder_eval, chroma_path="./engram_memory")
+            extrap_results[str(extrap_ctx)] = em
     t_eval_end = time.time()
 
     # Grad norm percentiles
@@ -363,6 +370,7 @@ def train(args) -> dict:
         "wall_time_train": round(t_train_end - t_train_start, 2),
         "wall_time_eval": round(t_eval_end - t_eval_start, 2),
         **eval_metrics,
+        **({"rope_extrap": extrap_results} if extrap_results else {}),
     }
 
     return result
