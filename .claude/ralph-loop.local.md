@@ -1,10 +1,12 @@
 ---
-active: true
+active: false
 iteration: 1
 session_id:
 max_iterations: 10
 completion_promise: "ENGRAM_COHERENT"
 started_at: "2026-04-26T02:00:00Z"
+halted_at: "2026-04-26T07:00:00Z"
+halt_reason: "v5 diagnosed as structural bug: model produces ~constant output regardless of input (cosine 1.0, ||delta|| 1e-7 across distinct prompts). Loss converged at 1.14 in both v4 and v5; output collapses to high-frequency-word direction (top-5 nearest: 'the','i','bot','a','and'). More compute won't fix this — needs architecture or generation-logic fix before another training run."
 prior_loop_completed: "ENGRAM_OPENMYTHOS_TRANSFER_COMPLETE at 2026-04-25T22:40Z (commit 581771c)"
 ---
 

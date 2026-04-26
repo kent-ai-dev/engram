@@ -132,16 +132,23 @@ a:hover{text-decoration:underline}
   </div>
 
   <!-- Honest status banner -->
-  <div class="card" style="margin-bottom:24px;border:1px solid var(--yellow)">
-    <div class="card-title" style="color:var(--yellow)">⚠ Honest Status — Live but Not Coherent</div>
+  <div class="card" style="margin-bottom:24px;border:1px solid var(--red)">
+    <div class="card-title" style="color:var(--red)">⛔ Status — Structural Bug Found, Training Loop Halted</div>
     <p style="font-size:0.9rem;line-height:1.6">
-      The deployed <span class="mono">v4_rope</span> model loads, runs inference, and responds
-      to chat requests — but its replies are currently <strong>repetitive nonsense</strong>
-      (e.g. <span class="mono small">"resigning slighted defilements impressiveness…"</span>).
-      Architecture and serving infrastructure are sound. The remaining gap is
-      <strong>training compute</strong>: the model has only seen 1 epoch on a
-      15 MB corpus dominated by 19th-century novels. A coherent chat model needs
-      ~5–30× more training (see roadmap below).
+      Update 2026-04-26: trained v5 (3 epochs on L4, $3.60). Loss converged at 1.1448.
+      Eval still produced gibberish — but the diagnostic check uncovered the actual problem:
+      <strong>the model produces a near-constant output regardless of input</strong>
+      (cosine 1.000, ||Δ|| ≈ 1×10<sup>-7</sup> for completely different prompts).
+      The output collapses toward high-frequency words ("the / i / bot / a / and"), suggesting
+      the residual + LayerNorm path dominates over the attention contribution, so the model
+      stopped at "predict the mean" as a local optimum.
+    </p>
+    <p style="font-size:0.9rem;line-height:1.6;margin-top:8px">
+      <strong>This is structural, not undertraining.</strong> v4 (1 epoch) and v5 (3 epochs)
+      show identical failure modes. More compute on the same architecture would just produce
+      a bigger constant function. The autonomous training loop has been halted; next step
+      is code investigation (residual scaling / post-RoPE attention mask / generation logic),
+      not more training spend.
     </p>
   </div>
 
