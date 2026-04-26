@@ -273,3 +273,110 @@ that's not acceptable:
 pkill -f engram_autonomous_loop.py
 pkill -f 'modal_train.py status'
 ```
+
+---
+
+## Update — 2026-04-26: ralph-loop pattern + v4_rope deployment
+
+The cron-driven loop above is the **batch** pattern. There is now a
+complementary **interactive** pattern using ralph-loop, suitable for
+multi-iteration objectives that span Claude Code sessions.
+
+### When to use which
+
+- **Cron loop (batch)**: continuous unattended improvement. Daily 3am UTC fire.
+  Decision logic in `engram_training_decision.py`. Score-based pass/fail.
+- **Ralph loop (interactive)**: focused multi-iteration objective (e.g.,
+  "train until coherent", "transfer architecture from OpenMythos"). State
+  in `.claude/ralph-loop.local.md`. Completion-promise-based stop.
+
+### Ralph-loop state file
+
+`.claude/ralph-loop.local.md`:
+
+```yaml
+---
+active: true
+iteration: 1
+session_id:
+max_iterations: 30
+completion_promise: "ENGRAM_COHERENT"
+started_at: "2026-04-26T01:55:00Z"
+---
+
+<the prompt that re-feeds each iteration>
+```
+
+When `active: true`, ralph-loop re-feeds the prompt at the end of each
+session. When the prompt's output anywhere contains the
+`completion_promise` literal string, the loop self-stops.
+
+### Past ralph-loops
+
+- **OpenMythos transfer** (2026-04-25, completed):
+  `completion_promise: "ENGRAM_OPENMYTHOS_TRANSFER_COMPLETE"`. Six phases
+  with strict pass/kill criteria from `bench/run.py`. Only Phase 5 (RoPE)
+  shipped; Phases 1, 2 killed; Phases 3, 4 skipped.
+  See `plans/OPENMYTHOS_TRANSFER.md` and `plans/EXECUTION_LOG.md`.
+
+### Active ralph-loop — Training to Coherent
+
+- **Started**: 2026-04-26
+- **Completion promise**: `ENGRAM_COHERENT`
+- **Criterion**:
+  1. `eval_chat.py` produces **different replies for different prompts**.
+  2. ≥80% of generated tokens are real English words.
+  3. ≥3 of 5 chitchat prompts produce a coherent dialog-shaped reply.
+- **Kill**: 5 consecutive iterations with no improvement OR cumulative
+  Modal spend > $50.
+
+Each iteration **must** (in order):
+
+1. Execute the next concrete training/eval action.
+2. Run `eval_chat.py` after every training run.
+3. Update **both** status pages — `index.html` (engram repo, `main`)
+   and `engram.html` (claw-journal repo, `gh-pages` branch).
+4. Append a one-line entry to `plans/EXECUTION_LOG.md`.
+5. Commit results to git.
+6. Decide pass / escalate / stop.
+7. If still iterating, schedule next wakeup via `ScheduleWakeup`
+   (1200–1800s).
+
+### Iteration plan
+
+| Iter | Variant | Change | Wall time | Cost |
+|------|---------|--------|-----------|------|
+| 1 | **v5** | 3 epochs · same 15 MB local corpus · L4 | ~4.5h | ~$3.60 |
+| 2 | **v5b** (if v5 fails) | 5 epochs · dailydialog-only (6 MB) · L4 | ~3h | ~$2.40 |
+| 3 | **v6** | 50M params · 12 layers · 384-dim · A10G | ~12h | ~$13 |
+| 4 | **v7** | + 200 MB conversational corpus · L40S | ~30h | ~$60 |
+| 5 | **v8** | 100M params · 1 GB corpus · L40S | ~80h | ~$160 |
+
+### Hard-won lessons (do not lose)
+
+- **`PYTHONUNBUFFERED=1` is mandatory** for `subprocess.run(["python",
+  "ingest.py"])` on Modal. Without it, training prints buffer until
+  exit and you can't watch progress. Use `python -u` too.
+- **Local entrypoints run locally**, not in Modal containers. Don't
+  open `/engram-weights/foo` from a `@app.local_entrypoint()` — that
+  path only exists inside `train_engram`. Use a separate Modal function
+  to upload config to the volume.
+- **TinyStories validation** is 18 MB and explodes the dataset to 6.3M
+  sequences, which doesn't fit Modal's 2-hour timeout. Now opt-in via
+  `USE_TINYSTORIES=true` in the config.
+- **Modal default timeout** is `timeout=7200` (2h) in `modal_train.py`.
+  Bump it for longer runs; cost is per-minute regardless.
+- **Bench `eval_cosine_top1` is broken at small scale** — it uses
+  `torch.randn()` embeddings and is stuck at 5.0% across every
+  architectural variant. Don't trust it. Use `eval_chat.py`.
+- **Server restart on Windows** requires killing the orphan
+  multiprocessing fork child, not just the parent. `Stop-Process`
+  on the parent leaves the child still binding port 5000.
+
+### Stopping the ralph-loop
+
+- **Manual**: edit `.claude/ralph-loop.local.md`, set `active: false`.
+  Also `TaskStop` any active Monitors.
+- **Self-stop**: emit `completion_promise` string in any output.
+- **Cost stop**: if Modal spend > $50 with no convergence, halt and
+  ask the user.
