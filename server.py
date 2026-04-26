@@ -18,6 +18,8 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from engram_model import AttentionBrain, EngramModule
+
 # ── Constants ──────────────────────────────────────────────────────────────────
 EMBED_DIM = 256
 CONTEXT_SIZE = 32
@@ -26,78 +28,21 @@ TEMPERATURE = 0.9
 TOP_K = 10
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Deploy full large model: large_iter4 weights + vocab (baseline_iter2 is deprecated)
-_model_dir = os.path.join(BASE_DIR, "models", "large_iter4")
+# Active model: v4_rope (8L/256D/RoPE, trained 2026-04-25 on Modal L4).
+# To roll back to large_iter4 (older, smaller, no RoPE), change ACTIVE_MODEL.
+ACTIVE_MODEL = "v4_rope"
+_model_dir = os.path.join(BASE_DIR, "models", ACTIVE_MODEL)
 if os.path.exists(os.path.join(_model_dir, "engram_weights.pth")):
     WEIGHTS_PATH = os.path.join(_model_dir, "engram_weights.pth")
-    # Use large_iter4's ChromaDB for both weights and vocab
-    CHROMA_PATH = os.path.join(BASE_DIR, "models", "large_iter4", "engram_memory")
+    CHROMA_PATH = os.path.join(_model_dir, "engram_memory")
+    ENGRAM_PATH = os.path.join(_model_dir, "engram_memory_module.pth")
+    W2ID_PATH = os.path.join(_model_dir, "engram_word_to_id.pth")
 else:
     CHROMA_PATH = os.path.join(BASE_DIR, "engram_memory")
     WEIGHTS_PATH = os.path.join(BASE_DIR, "engram_weights.pth")
+    ENGRAM_PATH = os.path.join(BASE_DIR, "engram_memory_module.pth")
+    W2ID_PATH = os.path.join(BASE_DIR, "engram_word_to_id.pth")
 GEN_STEPS = 20
-
-# ── Model Architecture (copied from eval_brain.py / ingest.py) ────────────────
-
-class AttentionBlock(nn.Module):
-    def __init__(self, embed_dim, context_size):
-        super().__init__()
-        self.W_q = nn.Linear(embed_dim, embed_dim, bias=False)
-        self.W_k = nn.Linear(embed_dim, embed_dim, bias=False)
-        self.W_v = nn.Linear(embed_dim, embed_dim, bias=False)
-        self.ln1 = nn.LayerNorm(embed_dim)
-        self.ff = nn.Sequential(
-            nn.Linear(embed_dim, embed_dim * 4),
-            nn.GELU(),
-            nn.Linear(embed_dim * 4, embed_dim),
-        )
-        self.ln2 = nn.LayerNorm(embed_dim)
-        mask = torch.tril(torch.ones(context_size, context_size))
-        self.register_buffer("mask", mask)
-
-    def forward(self, x):
-        T = x.size(1)
-        Q, K, V = self.W_q(x), self.W_k(x), self.W_v(x)
-        scale = x.size(-1) ** 0.5
-        scores = torch.matmul(Q, K.transpose(-2, -1)) / scale
-        scores = scores.masked_fill(self.mask[:T, :T].unsqueeze(0) == 0, float("-inf"))
-        attn = F.softmax(scores, dim=-1)
-        x = self.ln1(x + torch.matmul(attn, V))
-        x = self.ln2(x + self.ff(x))
-        return x
-
-
-class AttentionBrain(nn.Module):
-    def __init__(self, embed_dim=EMBED_DIM, context_size=CONTEXT_SIZE, n_layers=N_LAYERS, max_ponder=3):
-        super().__init__()
-        self.pos_embed = nn.Embedding(context_size, embed_dim)
-        self.blocks = nn.ModuleList([AttentionBlock(embed_dim, context_size) for _ in range(n_layers)])
-        self.ln_final = nn.LayerNorm(embed_dim)
-        self.halt_gate = nn.Linear(embed_dim, 1)
-        self.max_ponder = max_ponder
-
-    def forward(self, x):
-        T = x.size(1)
-        positions = torch.arange(T, dtype=torch.long)
-        x = x + self.pos_embed(positions).unsqueeze(0)
-
-        output = torch.zeros_like(x[:, -1, :])
-        remaining = torch.ones(x.size(0), 1)
-        n_steps = 0
-
-        for _ in range(self.max_ponder):
-            for block in self.blocks:
-                x = block(x)
-            last_token = x[:, -1, :]
-            halt_prob = torch.sigmoid(self.halt_gate(last_token))
-            output = output + remaining * last_token
-            remaining = remaining * (1 - halt_prob)
-            n_steps += 1
-            if not self.training and remaining.max().item() < 0.05:
-                break
-
-        output = output + remaining * last_token
-        return self.ln_final(output), n_steps
 
 
 # ── Inference helpers (from eval_brain.py) ─────────────────────────────────────
@@ -114,7 +59,8 @@ def nearest_words(predicted_t, word_list, vocab_matrix, word_to_idx, n=TOP_K, pe
     return [(word_list[i.item()], top_dists[j].item()) for j, i in enumerate(top_idx)]
 
 
-def generate_response(brain, word_list, vocab_matrix, word_to_idx, prompt_words, context_size):
+def generate_response(brain, word_list, vocab_matrix, word_to_idx, prompt_words, context_size,
+                      engram_module=None, word_to_id=None):
     SKIP = {"<START>", "<BOT>", "<USER>"}
     embed_dim = vocab_matrix.shape[1]
     context = ["<START>"] * context_size
@@ -136,7 +82,13 @@ def generate_response(brain, word_list, vocab_matrix, word_to_idx, prompt_words,
         ctx_stack = torch.stack(ctx_tensors)
 
         with torch.no_grad():
-            predicted, n_steps = brain(ctx_stack.unsqueeze(0))
+            ngram_memory = None
+            if engram_module is not None and word_to_id is not None:
+                ids = [word_to_id.get(w, 0) for w in context[-3:]]
+                ngram_memory = engram_module.lookup(ids).unsqueeze(0)
+            predicted, n_steps = brain(ctx_stack.unsqueeze(0),
+                                       ngram_memory=ngram_memory,
+                                       engram_module=engram_module)
             predicted = predicted.squeeze(0)
 
         ponder_steps_list.append(n_steps)
@@ -177,12 +129,16 @@ model_state = {
     "loaded": False,
     "error": None,
     "brain": None,
+    "engram_module": None,
+    "word_to_id": None,
     "word_list": None,
     "vocab_matrix": None,
     "word_to_idx": None,
     "vocab_size": 0,
     "corpus_books": 0,
     "iterations": 0,
+    "active_model": ACTIVE_MODEL,
+    "use_rope": False,
 }
 
 
@@ -233,14 +189,32 @@ def load_model():
         n_layers = max(
             int(k.split(".")[1]) for k in state_dict if k.startswith("blocks.")
         ) + 1
+        use_rope = any(k.startswith("blocks.") and k.endswith(".freqs_cis") for k in state_dict)
 
-        brain = AttentionBrain(embed_dim=embed_dim, context_size=context_size, n_layers=n_layers)
-        brain.load_state_dict(state_dict)
+        brain = AttentionBrain(embed_dim=embed_dim, context_size=context_size,
+                               n_layers=n_layers, use_rope=use_rope)
+        brain.load_state_dict(state_dict, strict=False)
         brain.eval()
+
+        # Optional EngramModule (N-gram memory) — only if both files exist
+        engram_module = None
+        word_to_id = None
+        if os.path.exists(ENGRAM_PATH) and os.path.exists(W2ID_PATH):
+            try:
+                engram_module = EngramModule(embed_dim)
+                engram_module.load_state_dict(torch.load(ENGRAM_PATH, weights_only=True))
+                engram_module.eval()
+                word_to_id = torch.load(W2ID_PATH, weights_only=False)
+                print(f"Loaded EngramModule ({len(word_to_id):,} word IDs)")
+            except Exception as e:
+                print(f"EngramModule load failed (continuing without N-gram memory): {e}")
+                engram_module = None
+                word_to_id = None
 
         # Update globals for inference
         model_state["embed_dim"] = embed_dim
         model_state["context_size"] = context_size
+        model_state["use_rope"] = use_rope
 
         # Count corpus books
         corpus_books = 0
@@ -265,6 +239,8 @@ def load_model():
             "loaded": True,
             "error": None,
             "brain": brain,
+            "engram_module": engram_module,
+            "word_to_id": word_to_id,
             "word_list": word_list,
             "vocab_matrix": vocab_matrix,
             "word_to_idx": word_to_idx,
@@ -272,7 +248,9 @@ def load_model():
             "corpus_books": corpus_books,
             "iterations": iterations,
         })
-        print(f"Engram model loaded: {len(embed_cache):,} vocab, {corpus_books} books, {iterations} iterations")
+        print(f"Engram model loaded: model={ACTIVE_MODEL}, vocab={len(embed_cache):,}, "
+              f"embed_dim={embed_dim}, n_layers={n_layers}, use_rope={use_rope}, "
+              f"engram_module={'yes' if engram_module else 'no'}")
 
     except Exception as e:
         model_state["error"] = str(e)
@@ -354,6 +332,8 @@ def chat(req: ChatRequest):
         model_state["word_to_idx"],
         prompt_words,
         model_state["context_size"],
+        engram_module=model_state.get("engram_module"),
+        word_to_id=model_state.get("word_to_id"),
     )
 
     response_text = " ".join(reply) if reply else "..."

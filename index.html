@@ -121,65 +121,72 @@ a:hover{text-decoration:underline}
   <div class="header">
     <div>
       <div class="logo">engram</div>
-      <div class="subtitle">Autonomous Training Status</div>
+      <div class="subtitle">v4_rope · Status Report</div>
     </div>
     <div class="header-right">
       <a class="chat-link" href="http://108.181.97.223:5000" target="_blank">
         Try Engram →
       </a>
-      <span class="updated">Updated: 2026-04-06 09:30 UTC</span>
+      <span class="updated">Updated: 2026-04-26 01:30 UTC</span>
     </div>
+  </div>
+
+  <!-- Honest status banner -->
+  <div class="card" style="margin-bottom:24px;border:1px solid var(--yellow)">
+    <div class="card-title" style="color:var(--yellow)">⚠ Honest Status — Live but Not Coherent</div>
+    <p style="font-size:0.9rem;line-height:1.6">
+      The deployed <span class="mono">v4_rope</span> model loads, runs inference, and responds
+      to chat requests — but its replies are currently <strong>repetitive nonsense</strong>
+      (e.g. <span class="mono small">"resigning slighted defilements impressiveness…"</span>).
+      Architecture and serving infrastructure are sound. The remaining gap is
+      <strong>training compute</strong>: the model has only seen 1 epoch on a
+      15 MB corpus dominated by 19th-century novels. A coherent chat model needs
+      ~5–30× more training (see roadmap below).
+    </p>
   </div>
 
   <!-- Score + Sub-scores grid -->
   <div class="grid">
 
-    <!-- Score gauge -->
+    <!-- Active model card -->
     <div class="card">
-      <div class="card-title">Latest Score</div>
+      <div class="card-title">Active Deployment</div>
       <div class="score-gauge">
-        <div>
-          <span class="score-big">61.1</span>
-          <span class="score-denom"> / 100</span>
+        <div><span class="score-big" style="font-size:2.5rem;color:var(--cyan)">v4_rope</span></div>
+        <div><span class="status-badge" style="background:var(--yellow);color:#000">LIVE · GIBBERISH</span></div>
+        <div class="score-ts">Trained 2026-04-26 01:18 UTC · Modal L4 GPU</div>
+        <div class="failure-tags" style="justify-content:center;margin-top:10px">
+          <span class=tag style="border-color:var(--green);color:var(--green)">RoPE</span>
+          <span class=tag style="border-color:var(--green);color:var(--green)">8 layers</span>
+          <span class=tag style="border-color:var(--green);color:var(--green)">256-dim</span>
+          <span class=tag style="border-color:var(--yellow);color:var(--yellow)">undertrained</span>
         </div>
-        <div><span class="status-badge" style="background:var(--green);color:#fff">PASS — DEPLOYED</span></div>
-        <div class="score-ts">2026-04-06 09:02 UTC</div>
-        <div class="failure-tags" style="justify-content:center;margin-top:10px"><span class=tag style="border-color:var(--green);color:var(--green)">modal_training</span> <span class=tag style="border-color:var(--green);color:var(--green)">10_epochs_running</span></div>
       </div>
     </div>
 
-    <!-- Sub-score breakdown -->
+    <!-- Training metrics -->
     <div class="card">
-      <div class="card-title">Score Breakdown</div>
-      
-        <div class="sub-score-row">
-          <span class="sub-label muted">surprise</span>
-          <div class="bar-track">
-            <div class="bar-fill" style="width:38%;background:var(--red)"></div>
-          </div>
-          <span class="sub-val mono" style="color:var(--yellow)">42</span>
-        </div>
-        <div class="sub-score-row">
-          <span class="sub-label muted">coherence</span>
-          <div class="bar-track">
-            <div class="bar-fill" style="width:72%;background:var(--green)"></div>
-          </div>
-          <span class="sub-val mono" style="color:var(--green)">72</span>
-        </div>
-        <div class="sub-score-row">
-          <span class="sub-label muted">length</span>
-          <div class="bar-track">
-            <div class="bar-fill" style="width:100%;background:var(--green)"></div>
-          </div>
-          <span class="sub-val mono" style="color:var(--green)">100</span>
-        </div>
-        <div class="sub-score-row">
-          <span class="sub-label muted">ponder</span>
-          <div class="bar-track">
-            <div class="bar-fill" style="width:33%;background:var(--red)"></div>
-          </div>
-          <span class="sub-val mono" style="color:var(--red)">33</span>
-        </div>
+      <div class="card-title">v4 Training Metrics</div>
+      <div class="sub-score-row">
+        <span class="sub-label muted">final loss</span>
+        <div class="bar-track"><div class="bar-fill" style="width:75%;background:var(--green)"></div></div>
+        <span class="sub-val mono" style="color:var(--green)">1.1347</span>
+      </div>
+      <div class="sub-score-row">
+        <span class="sub-label muted">grad p99</span>
+        <div class="bar-track"><div class="bar-fill" style="width:65%;background:var(--green)"></div></div>
+        <span class="sub-val mono" style="color:var(--green)">0.28</span>
+      </div>
+      <div class="sub-score-row">
+        <span class="sub-label muted">epochs</span>
+        <div class="bar-track"><div class="bar-fill" style="width:20%;background:var(--red)"></div></div>
+        <span class="sub-val mono" style="color:var(--red)">1 / 5+</span>
+      </div>
+      <div class="sub-score-row">
+        <span class="sub-label muted">eval</span>
+        <div class="bar-track"><div class="bar-fill" style="width:5%;background:var(--red)"></div></div>
+        <span class="sub-val mono" style="color:var(--red)">FAIL</span>
+      </div>
     </div>
 
   </div>
@@ -189,36 +196,234 @@ a:hover{text-decoration:underline}
     <div class="card-title">Server Status</div>
     <div class="info-row">
       <span class="info-key">Status</span>
-      <span class="info-val" style="color:var(--green)">OK</span>
+      <span class="info-val" style="color:var(--green)">Live (HTTP 200)</span>
     </div>
     <div class="info-row">
-      <span class="info-key">Model loaded</span>
-      <span class="info-val" style="color:var(--green)">Yes</span>
+      <span class="info-key">Active model</span>
+      <span class="info-val mono" style="color:var(--cyan)">v4_rope</span>
+    </div>
+    <div class="info-row">
+      <span class="info-key">Architecture</span>
+      <span class="info-val mono">8L · 256D · 8H · ctx=32 · RoPE</span>
+    </div>
+    <div class="info-row">
+      <span class="info-key">Brain params</span>
+      <span class="info-val mono">6,318,849 (+ 12.9M N-gram tables)</span>
     </div>
     <div class="info-row">
       <span class="info-key">Vocab size</span>
-      <span class="info-val mono">37591</span>
+      <span class="info-val mono">38,062</span>
     </div>
     <div class="info-row">
-      <span class="info-key">Corpus books</span>
-      <span class="info-val mono">13</span>
+      <span class="info-key">Corpus</span>
+      <span class="info-val mono">15 MB · 14 books + dailydialog</span>
     </div>
     <div class="info-row">
-      <span class="info-key">Training Loss</span>
-      <span class="info-val mono">0.9751</span>
+      <span class="info-key">Training loss</span>
+      <span class="info-val mono">1.1347 (avg, 1 epoch)</span>
     </div>
     <div class="info-row">
       <span class="info-key">Platform</span>
       <span class="info-val mono" style="color:var(--green)">Modal (L4 GPU)</span>
     </div>
     <div class="info-row">
-      <span class="info-key">Iterations</span>
-      <span class="info-val mono">5</span>
-    </div>
-    <div class="info-row">
       <span class="info-key">Endpoint</span>
       <span class="info-val mono small"><a href="http://108.181.97.223:5000">http://108.181.97.223:5000</a></span>
     </div>
+  </div>
+
+  <!-- OpenMythos transfer ablation -->
+  <div class="card" style="margin-bottom:24px">
+    <div class="card-title">OpenMythos Architecture Transfer — Ablation Results</div>
+    <p style="font-size:0.85rem;color:var(--muted);margin-bottom:12px">
+      Five architectural ideas from <span class="mono">kyegomez/OpenMythos</span> were ported
+      and tested with strict pass/kill criteria from a benchmark harness
+      (<span class="mono">bench/run.py</span>). Only one shipped.
+    </p>
+    <table class="runs-table">
+      <thead>
+        <tr>
+          <th>Phase</th>
+          <th>Idea</th>
+          <th>Status</th>
+          <th>Why</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="mono">0</td>
+          <td>Reproducibility harness + baseline</td>
+          <td><span class="badge" style="color:var(--green);border-color:var(--green)">PASSED</span></td>
+          <td class="muted small">0.0e+00 loss diff between identical runs; baseline locked</td>
+        </tr>
+        <tr>
+          <td class="mono">1</td>
+          <td>LTI residual injection</td>
+          <td><span class="badge" style="color:var(--red);border-color:var(--red)">KILLED</span></td>
+          <td class="muted small">grad_norm_p99 unchanged (0.572 vs 0.561); no eval gain</td>
+        </tr>
+        <tr>
+          <td class="mono">2</td>
+          <td>Loop-index sinusoidal embedding</td>
+          <td><span class="badge" style="color:var(--red);border-color:var(--red)">KILLED</span></td>
+          <td class="muted small">halt gate completely insensitive to loop signal</td>
+        </tr>
+        <tr>
+          <td class="mono">3</td>
+          <td>Inference-time depth extrapolation</td>
+          <td><span class="badge" style="color:var(--muted);border-color:var(--muted)">SKIPPED</span></td>
+          <td class="muted small">Phase 1+2 prereq chain broken</td>
+        </tr>
+        <tr>
+          <td class="mono">4</td>
+          <td>Per-loop LoRA</td>
+          <td><span class="badge" style="color:var(--muted);border-color:var(--muted)">SKIPPED</span></td>
+          <td class="muted small">Phase 1–3 prereq chain broken</td>
+        </tr>
+        <tr>
+          <td class="mono">5</td>
+          <td>RoPE positional encoding</td>
+          <td><span class="badge" style="color:var(--green);border-color:var(--green)">PASSED · SHIPPED</span></td>
+          <td class="muted small">grad_norm_p99 halved (0.561→0.280); zero quality cliff at 3× train context</td>
+        </tr>
+        <tr>
+          <td class="mono">6</td>
+          <td>Lock + document</td>
+          <td><span class="badge" style="color:var(--green);border-color:var(--green)">PASSED</span></td>
+          <td class="muted small">use_rope=True locked as default; README updated</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Eval report -->
+  <div class="card" style="margin-bottom:24px">
+    <div class="card-title">Evaluation Report — Human Judgement</div>
+    <p style="font-size:0.9rem;line-height:1.6;margin-bottom:14px">
+      A 16-prompt evaluation across three difficulty buckets (greetings · chitchat · harder Q&amp;A)
+      was run against <span class="mono">v4_rope</span>. Result: <strong style="color:var(--red)">all
+      32 generated replies were near-identical sequences of rare/odd words</strong> regardless
+      of input prompt. Example prompt/reply pairs:
+    </p>
+    <div class="mono small" style="background:var(--bg);padding:12px;border-radius:6px;border:1px solid var(--border);line-height:1.7">
+      <span style="color:var(--cyan)">[USER]</span> hello<br>
+      <span style="color:var(--yellow)">[BOT]</span> you for suavely user resigning to the for impressiveness resigning i you freshener that the<br><br>
+      <span style="color:var(--cyan)">[USER]</span> what is the capital of france<br>
+      <span style="color:var(--yellow)">[BOT]</span> that slighted resigning to impressiveness you the i and to resigning the defilements for you<br><br>
+      <span style="color:var(--cyan)">[USER]</span> tell me a story<br>
+      <span style="color:var(--yellow)">[BOT]</span> you for suavely user resigning to the for impressiveness resigning i you freshener that the
+    </div>
+    <p style="font-size:0.9rem;line-height:1.6;margin-top:14px">
+      <strong>Diagnosis:</strong> the model isn't conditioning on input prompts. The output
+      collapses to the same vocab cluster regardless of context. Two plausible causes:
+    </p>
+    <ul style="font-size:0.9rem;line-height:1.7;padding-left:24px;margin-top:8px">
+      <li><strong>Undertraining</strong> — 1 epoch on a corpus where ~50% is 19th-century novels means rare archaic vocab dominates the output distribution. Classic sign of insufficient gradient steps.</li>
+      <li><strong>Eval bug</strong> — the bench harness used <span class="mono">torch.randn()</span> embeddings in its <span class="mono">eval_cosine_top1</span>, which never moved off 5.0% across <em>any</em> architectural change. The metric may be saturated / noise-dominated, but live eval on real ChromaDB embeddings still produces nonsense — so undertraining is the dominant explanation.</li>
+    </ul>
+  </div>
+
+  <!-- Cost roadmap -->
+  <div class="card" style="margin-bottom:24px">
+    <div class="card-title">Roadmap to Coherent — Cost &amp; Time Tiers</div>
+    <p style="font-size:0.85rem;color:var(--muted);margin-bottom:12px">
+      Modal pricing as of 2026-04-26 (Starter plan, $25 included credits). Each tier
+      assumes restart from previous run + bug fixes. <strong>Recommendation: don't
+      budget more than $5 until v5 confirms whether undertraining is really the bottleneck.</strong>
+    </p>
+    <table class="runs-table">
+      <thead>
+        <tr>
+          <th>Tier</th>
+          <th>Change</th>
+          <th>Wall time</th>
+          <th>GPU</th>
+          <th>Cost</th>
+          <th>Expected quality</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="mono">v4 (now)</td>
+          <td class="small">19M params · 15 MB corpus · 1 epoch</td>
+          <td class="mono">~1.5h</td>
+          <td class="mono">L4 ($0.80/h)</td>
+          <td class="mono" style="color:var(--green)">$1.20</td>
+          <td class="muted small">gibberish (current)</td>
+        </tr>
+        <tr>
+          <td class="mono">v5</td>
+          <td class="small">+ full dailydialog · 5 epochs</td>
+          <td class="mono">~6h</td>
+          <td class="mono">L4</td>
+          <td class="mono" style="color:var(--green)">~$5</td>
+          <td class="muted small">most greetings/chitchat coherent</td>
+        </tr>
+        <tr>
+          <td class="mono">v6</td>
+          <td class="small">+ bigger model (50M params, 12 layers)</td>
+          <td class="mono">~12h</td>
+          <td class="mono">A10G ($1.10/h)</td>
+          <td class="mono" style="color:var(--yellow)">~$13</td>
+          <td class="muted small">usually-coherent short replies</td>
+        </tr>
+        <tr>
+          <td class="mono">v7</td>
+          <td class="small">+ 200 MB conversational corpus · 80M params</td>
+          <td class="mono">~30h</td>
+          <td class="mono">L40S ($1.95/h)</td>
+          <td class="mono" style="color:var(--yellow)">~$60</td>
+          <td class="muted small">actual conversation, occasional weirdness</td>
+        </tr>
+        <tr>
+          <td class="mono">v8</td>
+          <td class="small">+ 1 GB corpus · 100M params · 5 epochs</td>
+          <td class="mono">~80h</td>
+          <td class="mono">L40S</td>
+          <td class="mono" style="color:var(--red)">~$160</td>
+          <td class="muted small">GPT-2-tier coherence</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Logical next steps -->
+  <div class="card" style="margin-bottom:24px">
+    <div class="card-title">Logical Next Steps (in order)</div>
+    <ol style="font-size:0.9rem;line-height:1.8;padding-left:24px">
+      <li>
+        <strong>Sanity-check the eval pipeline first.</strong> Before spending more compute,
+        dump the raw concept prediction (pre-nearest-word) for two different prompts and
+        confirm they actually differ. If predictions are identical → it's a generation/serving bug,
+        not undertraining; cheaper to fix code than train more. (~30 min, $0.)
+      </li>
+      <li>
+        <strong>Add real eval metrics.</strong> Replace the random-embedding
+        <span class="mono">eval_cosine_top1</span> with held-out perplexity on actual ChromaDB
+        embeddings. The bench's 5.0% plateau across every architectural variant strongly suggests
+        the metric is broken. (~1h, $0.)
+      </li>
+      <li>
+        <strong>Run v5: more epochs + balance the corpus.</strong> 5 epochs, drop the heaviest
+        archaic-vocab books (Moby Dick, Pride and Prejudice), keep dailydialog as the primary
+        signal. ~6h on L4, ~$5. Re-run eval. If gibberish persists → it's a model-capacity issue.
+      </li>
+      <li>
+        <strong>If v5 is better but still rough → v6 (bigger model).</strong>
+        384-dim, 12 layers, ~50M params. RoPE has already shown it stabilizes gradient at this
+        scale. ~12h on A10G, ~$13.
+      </li>
+      <li>
+        <strong>If v6 works → v7 (real conversational corpus).</strong> Add Reddit conversations,
+        persona-chat, OpenAssistant — datasets that match the conversational format the model
+        is being judged on.
+      </li>
+      <li>
+        <strong>Architectural revisits.</strong> Some Phase 1–4 ideas may have failed because
+        they were tested on an undertrained baseline. Worth re-evaluating LTI and per-loop LoRA
+        at v6+ scale where they're more likely to matter.
+      </li>
+    </ol>
   </div>
 
   <!-- Recent runs -->
@@ -228,42 +433,53 @@ a:hover{text-decoration:underline}
       <thead>
         <tr>
           <th>Timestamp</th>
-          <th>Score</th>
+          <th>Model</th>
           <th>Status</th>
-          <th>Failure Modes</th>
+          <th>Notes</th>
         </tr>
       </thead>
       <tbody>
-        
+        <tr>
+          <td class="mono muted">2026-04-26 01:18</td>
+          <td class="mono" style="color:var(--cyan)">v4_rope</td>
+          <td><span class="badge" style="color:var(--yellow);border-color:var(--yellow)">DEPLOYED · GIBBERISH</span></td>
+          <td class="muted small">1 epoch, 15 MB corpus, loss=1.1347, eval failed (see report)</td>
+        </tr>
+        <tr>
+          <td class="mono muted">2026-04-25 22:31</td>
+          <td class="mono">phase5_5b</td>
+          <td><span class="badge" style="color:var(--green);border-color:var(--green)">PASSED</span></td>
+          <td class="muted small">RoPE extrapolation: 5.0% top1 maintained at 2× and 3× train context</td>
+        </tr>
+        <tr>
+          <td class="mono muted">2026-04-25 22:12</td>
+          <td class="mono">phase5_5a</td>
+          <td><span class="badge" style="color:var(--green);border-color:var(--green)">PASSED</span></td>
+          <td class="muted small">RoPE at-distribution: grad_norm_p99 halved (0.561→0.280)</td>
+        </tr>
+        <tr>
+          <td class="mono muted">2026-04-25 21:58</td>
+          <td class="mono">phase2_loopidx</td>
+          <td><span class="badge" style="color:var(--red);border-color:var(--red)">KILLED</span></td>
+          <td class="muted small">halt gate insensitive to loop signal</td>
+        </tr>
+        <tr>
+          <td class="mono muted">2026-04-25 21:47</td>
+          <td class="mono">phase1_lti</td>
+          <td><span class="badge" style="color:var(--red);border-color:var(--red)">KILLED</span></td>
+          <td class="muted small">no grad-norm or eval gain</td>
+        </tr>
+        <tr>
+          <td class="mono muted">2026-04-25 21:13</td>
+          <td class="mono">baseline</td>
+          <td><span class="badge" style="color:var(--green);border-color:var(--green)">LOCKED</span></td>
+          <td class="muted small">eval_cosine_top1=5.0%, grad_norm_p99=0.561, reproducible</td>
+        </tr>
         <tr>
           <td class="mono muted">2026-04-06 09:02</td>
-          <td style="color:var(--green);font-weight:600">61.1</td>
-          <td><span class="badge" style="color:var(--green);border-color:var(--green)">TRAINED + DEPLOYED</span></td>
-          <td class="muted small">Modal L4, 3 epochs, loss=0.9751, vocab=37591</td>
-        </tr>
-        <tr>
-          <td class="mono muted">2026-04-06 09:34</td>
-          <td style="color:var(--cyan);font-weight:600">—</td>
-          <td><span class="badge" style="color:var(--cyan);border-color:var(--cyan)">TRAINING</span></td>
-          <td class="muted small">Modal L4, 10 epochs (in progress)</td>
-        </tr>
-        <tr>
-          <td class="mono muted">2026-04-05 21:44</td>
-          <td style="color:var(--red);font-weight:600">—</td>
-          <td><span class="badge" style="color:var(--red);border-color:var(--red)">TIMEOUT</span></td>
-          <td class="muted small">SaladCloud 8.7h, GPU preemption</td>
-        </tr>
-        <tr>
-          <td class="mono muted">2026-04-06 06:27</td>
-          <td style="color:var(--green);font-weight:600">60.2</td>
-          <td><span class="badge" style="color:var(--yellow);border-color:var(--yellow)">PASS</span></td>
-          <td class="muted small">Auto-eval, no training needed</td>
-        </tr>
-        <tr>
-          <td class="mono muted">2026-04-02 05:45</td>
-          <td style="color:var(--yellow);font-weight:600">59.6</td>
-          <td><span class="badge" style="color:var(--yellow);border-color:var(--yellow)">TRAIN_LAUNCH_FAILED</span></td>
-          <td class="muted small">high_surprise (SaladCloud)</td>
+          <td class="mono">large_iter4</td>
+          <td><span class="badge" style="color:var(--muted);border-color:var(--muted)">REPLACED</span></td>
+          <td class="muted small">Pre-RoPE model (128D · 5L · ctx=16) — kept available for rollback</td>
         </tr>
       </tbody>
     </table>
@@ -271,8 +487,8 @@ a:hover{text-decoration:underline}
 
   <!-- Footer -->
   <div class="footer">
-    <p>engram is an experimental neural language model with pondering. <a href="https://github.com/kent-ai-dev/engram" target="_blank">GitHub</a></p>
-    <p style="margin-top:4px">Status page auto-updated after every training loop.</p>
+    <p>engram is an experimental neural language model with adaptive pondering, N-gram memory, and continuous-concept vocabulary. <a href="https://github.com/kent-ai-dev/engram" target="_blank">GitHub</a></p>
+    <p style="margin-top:4px">Status report manually generated 2026-04-26.</p>
   </div>
 
 </div>
