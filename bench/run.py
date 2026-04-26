@@ -232,7 +232,7 @@ def train(args) -> dict:
     engram.to(device)
 
     all_params = list(brain.parameters()) + list(engram.parameters())
-    optimizer = optim.Adam(all_params, lr=1e-3)
+    optimizer = optim.AdamW(all_params, lr=1e-3, weight_decay=0.01)
     total_steps = ((len(sequences) + args.batch_size - 1) // args.batch_size) * args.epochs
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=total_steps, eta_min=1e-5)
 

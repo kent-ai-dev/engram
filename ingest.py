@@ -291,7 +291,9 @@ def main():
     brain.to(DEVICE)
     engram.to(DEVICE)
     all_params = list(brain.parameters()) + list(engram.parameters())
-    optimizer = optim.Adam(all_params, lr=BRAIN_LR)
+    # AdamW with weight decay — without it, MSE training on broad target
+    # distributions converges to "predict the mean" (v4/v5 mode collapse).
+    optimizer = optim.AdamW(all_params, lr=BRAIN_LR, weight_decay=0.01)
     # Cosine LR schedule: decay from BRAIN_LR to 1e-5 over training
     total_steps = ((len(sequences) + BATCH_SIZE - 1) // BATCH_SIZE) * EPOCHS
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=total_steps, eta_min=1e-5)

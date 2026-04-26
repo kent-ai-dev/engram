@@ -1,12 +1,13 @@
 ---
-active: false
-iteration: 1
+active: true
+iteration: 2
 session_id:
 max_iterations: 10
 completion_promise: "ENGRAM_COHERENT"
 started_at: "2026-04-26T02:00:00Z"
-halted_at: "2026-04-26T07:00:00Z"
-halt_reason: "v5 diagnosed as structural bug: model produces ~constant output regardless of input (cosine 1.0, ||delta|| 1e-7 across distinct prompts). Loss converged at 1.14 in both v4 and v5; output collapses to high-frequency-word direction (top-5 nearest: 'the','i','bot','a','and'). More compute won't fix this — needs architecture or generation-logic fix before another training run."
+last_halted_at: "2026-04-26T07:00:00Z"
+last_halt_reason: "v5 diagnosed: Post-LN architecture caused mode collapse — block 0 attention softmax went near-uniform (max 0.033) and FF norm exploded to 360 vs residual 16, drowning input signal. Untrained model showed cos 0.62 (healthy); training collapsed to cos 1.0 (constant output)."
+fix_applied: "Pre-LN architecture in engram_model.py AttentionBlock.forward (LN before each sublayer instead of after residual) + AdamW with weight_decay=0.01 in ingest.py and bench/run.py. Untrained Pre-LN model verified to preserve input differentiation (cos +0.15 after 8 layers, ||Δ|| 20.6, norm growth controlled 3→16)."
 prior_loop_completed: "ENGRAM_OPENMYTHOS_TRANSFER_COMPLETE at 2026-04-25T22:40Z (commit 581771c)"
 ---
 

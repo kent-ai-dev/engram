@@ -59,8 +59,15 @@ class AttentionBlock(nn.Module):
             self.register_buffer("freqs_cis", freqs_cis)
 
     def forward(self, x):
+        # Pre-LN architecture: LN BEFORE each sublayer, residual added without LN.
+        # Switched from post-LN after v5 diagnostic showed input differentiation
+        # collapsed inside block 0: attention softmax went to near-uniform and
+        # the FF residual was 22× larger than its input, drowning out the signal.
         B, T, D = x.size()
-        Q, K, V = self.W_q(x), self.W_k(x), self.W_v(x)
+
+        # Attention sublayer
+        h = self.ln1(x)
+        Q, K, V = self.W_q(h), self.W_k(h), self.W_v(h)
         Q = Q.view(B, T, self.n_heads, self.head_dim).transpose(1, 2)
         K = K.view(B, T, self.n_heads, self.head_dim).transpose(1, 2)
         V = V.view(B, T, self.n_heads, self.head_dim).transpose(1, 2)
@@ -73,8 +80,10 @@ class AttentionBlock(nn.Module):
         attn = F.softmax(scores, dim=-1)
         out = torch.matmul(attn, V).transpose(1, 2).contiguous().view(B, T, D)
         out = self.W_o(out)
-        x = self.ln1(x + out)
-        x = self.ln2(x + self.ff(x))
+        x = x + out
+
+        # Feed-forward sublayer
+        x = x + self.ff(self.ln2(x))
         return x
 
 
