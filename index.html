@@ -132,23 +132,24 @@ a:hover{text-decoration:underline}
   </div>
 
   <!-- Honest status banner -->
-  <div class="card" style="margin-bottom:24px;border:1px solid var(--red)">
-    <div class="card-title" style="color:var(--red)">⛔ Status — Structural Bug Found, Training Loop Halted</div>
+  <div class="card" style="margin-bottom:24px;border:1px solid var(--yellow)">
+    <div class="card-title" style="color:var(--yellow)">⚠ Status — Architecture Bug FIXED, Quality Issue Remains</div>
     <p style="font-size:0.9rem;line-height:1.6">
-      Update 2026-04-26: trained v5 (3 epochs on L4, $3.60). Loss converged at 1.1448.
-      Eval still produced gibberish — but the diagnostic check uncovered the actual problem:
-      <strong>the model produces a near-constant output regardless of input</strong>
-      (cosine 1.000, ||Δ|| ≈ 1×10<sup>-7</sup> for completely different prompts).
-      The output collapses toward high-frequency words ("the / i / bot / a / and"), suggesting
-      the residual + LayerNorm path dominates over the attention contribution, so the model
-      stopped at "predict the mean" as a local optimum.
+      Update 2026-04-27: <strong>v6 (Pre-LN + AdamW) succeeded at the structural fix</strong>
+      diagnosed in v5. Diagnostic confirms model now conditions on input —
+      <span class="mono">cosine(p1, p2)</span> went from <strong>1.000 → 0.960</strong>;
+      <span class="mono">||Δ||</span> went from <strong>1×10<sup>-7</sup> → 0.43</strong>.
+      All 16 eval prompts now produce distinct replies (vs identical replies in v5).
+      Avg ponder steps: 3.0 (vs 1.0 in v5 — model now uses full reasoning depth).
+      Final training loss 1.0509 (vs v5's 1.1448).
     </p>
     <p style="font-size:0.9rem;line-height:1.6;margin-top:8px">
-      <strong>This is structural, not undertraining.</strong> v4 (1 epoch) and v5 (3 epochs)
-      show identical failure modes. More compute on the same architecture would just produce
-      a bigger constant function. The autonomous training loop has been halted; next step
-      is code investigation (residual scaling / post-RoPE attention mask / generation logic),
-      not more training spend.
+      <strong>But output is still gibberish-quality.</strong> Replies contain heavy 19th-century
+      novel vocab — <span class="mono small">"ichthyosaurus / maachah / derbies / harringtons / _baron"</span>
+      — because ~60% of the 15 MB training corpus is Moby Dick / Dracula / Pride and Prejudice.
+      Architecture is healthy; data is the new bottleneck.
+      <strong>Loop halted for user decision on next spend</strong> (v7 dailydialog-only ~$2 vs
+      v8 bigger model ~$13).
     </p>
   </div>
 
@@ -159,14 +160,15 @@ a:hover{text-decoration:underline}
     <div class="card">
       <div class="card-title">Active Deployment</div>
       <div class="score-gauge">
-        <div><span class="score-big" style="font-size:2.5rem;color:var(--cyan)">v4_rope</span></div>
-        <div><span class="status-badge" style="background:var(--yellow);color:#000">LIVE · GIBBERISH</span></div>
-        <div class="score-ts">Trained 2026-04-26 01:18 UTC · Modal L4 GPU</div>
+        <div><span class="score-big" style="font-size:2.5rem;color:var(--cyan)">v6_preln</span></div>
+        <div><span class="status-badge" style="background:var(--yellow);color:#000">LIVE · GIBBERISH (DIFFERENT)</span></div>
+        <div class="score-ts">Trained 2026-04-27 03:42 UTC · Modal L4 GPU</div>
         <div class="failure-tags" style="justify-content:center;margin-top:10px">
+          <span class=tag style="border-color:var(--green);color:var(--green)">Pre-LN</span>
+          <span class=tag style="border-color:var(--green);color:var(--green)">AdamW</span>
           <span class=tag style="border-color:var(--green);color:var(--green)">RoPE</span>
-          <span class=tag style="border-color:var(--green);color:var(--green)">8 layers</span>
-          <span class=tag style="border-color:var(--green);color:var(--green)">256-dim</span>
-          <span class=tag style="border-color:var(--yellow);color:var(--yellow)">undertrained</span>
+          <span class=tag style="border-color:var(--green);color:var(--green)">conditions on input</span>
+          <span class=tag style="border-color:var(--yellow);color:var(--yellow)">novel vocab</span>
         </div>
       </div>
     </div>

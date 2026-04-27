@@ -1,13 +1,14 @@
 ---
-active: true
+active: false
 iteration: 2
 session_id:
 max_iterations: 10
 completion_promise: "ENGRAM_COHERENT"
 started_at: "2026-04-26T02:00:00Z"
-last_halted_at: "2026-04-26T07:00:00Z"
-last_halt_reason: "v5 diagnosed: Post-LN architecture caused mode collapse — block 0 attention softmax went near-uniform (max 0.033) and FF norm exploded to 360 vs residual 16, drowning input signal. Untrained model showed cos 0.62 (healthy); training collapsed to cos 1.0 (constant output)."
-fix_applied: "Pre-LN architecture in engram_model.py AttentionBlock.forward (LN before each sublayer instead of after residual) + AdamW with weight_decay=0.01 in ingest.py and bench/run.py. Untrained Pre-LN model verified to preserve input differentiation (cos +0.15 after 8 layers, ||Δ|| 20.6, norm growth controlled 3→16)."
+last_halted_at: "2026-04-27T03:50:00Z"
+last_halt_reason: "v6 (Pre-LN + AdamW) ARCHITECTURE FIX SUCCEEDED — diag cos 1.000→0.960, ||Δ|| 1e-7→0.43. Different replies per prompt (criterion 1 PASS). But output is still gibberish-quality with heavy 19th-century novel vocab (ichthyosaurus/maachah/derbies/harringtons). Criteria 2/3 fail. This is now a DATA problem, not architecture. Halting for user input on next $3-15 spend (v7 dailydialog-only vs v8 bigger model)."
+fix_applied: "Pre-LN architecture in engram_model.py AttentionBlock.forward (LN before each sublayer instead of after residual) + AdamW with weight_decay=0.01 in ingest.py and bench/run.py. v6 final loss 1.0509 (vs v5 1.1448) with avg_ponder=3.0 (vs v5 1.0)."
+v6_eval_summary: "16/16 prompts produce distinct replies. Output direction conditions on input. Vocab quality poor due to corpus dominated by Gutenberg novels (~60% of 15MB)."
 prior_loop_completed: "ENGRAM_OPENMYTHOS_TRANSFER_COMPLETE at 2026-04-25T22:40Z (commit 581771c)"
 ---
 
