@@ -1,6 +1,6 @@
 ---
-active: false
-iteration: 2
+active: true
+iteration: 3
 session_id:
 max_iterations: 10
 completion_promise: "ENGRAM_COHERENT"
