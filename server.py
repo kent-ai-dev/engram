@@ -135,8 +135,7 @@ model_state = {
     "vocab_matrix": None,
     "word_to_idx": None,
     "vocab_size": 0,
-    "corpus_books": 0,
-    "iterations": 0,
+    "model_card": {},
     "active_model": ACTIVE_MODEL,
     "use_rope": False,
 }
@@ -216,24 +215,16 @@ def load_model():
         model_state["context_size"] = context_size
         model_state["use_rope"] = use_rope
 
-        # Count corpus books
-        corpus_books = 0
-        corpus_dir = os.path.join(BASE_DIR, "corpus")
-        if os.path.exists(corpus_dir):
-            corpus_books = len([f for f in os.listdir(corpus_dir) if f.endswith(".txt")])
-
-        # Count training iterations from log
-        iterations = 0
-        log_path = os.path.join(BASE_DIR, "training_log.jsonl")
-        if os.path.exists(log_path):
-            with open(log_path, "r") as f:
-                for line in f:
-                    try:
-                        entry = json.loads(line)
-                        if entry.get("type") == "iteration_complete":
-                            iterations = max(iterations, entry.get("iteration", 0))
-                    except Exception:
-                        pass
+        # Read model card if available — overrides stale corpus/iter counters
+        # with actual training metadata for THIS model version.
+        card = {}
+        card_path = os.path.join(_model_dir, "model_card.json")
+        if os.path.exists(card_path):
+            try:
+                with open(card_path, "r") as f:
+                    card = json.load(f)
+            except Exception as e:
+                print(f"Failed to read model_card.json: {e}")
 
         model_state.update({
             "loaded": True,
@@ -245,8 +236,7 @@ def load_model():
             "vocab_matrix": vocab_matrix,
             "word_to_idx": word_to_idx,
             "vocab_size": len(embed_cache),
-            "corpus_books": corpus_books,
-            "iterations": iterations,
+            "model_card": card,
         })
         print(f"Engram model loaded: model={ACTIVE_MODEL}, vocab={len(embed_cache):,}, "
               f"embed_dim={embed_dim}, n_layers={n_layers}, use_rope={use_rope}, "
@@ -288,29 +278,42 @@ def index():
     return FileResponse(os.path.join(STATIC_DIR, "index.html"))
 
 
-@app.get("/status")
-def status():
+def _status_payload():
+    card = model_state.get("model_card") or {}
     return {
         "loaded": model_state["loaded"],
         "error": model_state["error"],
+        "active_model": model_state["active_model"],
         "vocab_size": model_state["vocab_size"],
-        "corpus_books": model_state["corpus_books"],
-        "iterations": model_state["iterations"],
+        "embed_dim": model_state.get("embed_dim", 0),
+        "n_layers": card.get("n_layers", 0),
+        "n_heads": card.get("n_heads", 0),
+        "context_size": model_state.get("context_size", 0),
+        "use_rope": model_state.get("use_rope", False),
+        "architecture": card.get("architecture", ""),
+        "epochs": card.get("epochs", 0),
+        "final_loss": card.get("final_loss", 0.0),
+        "avg_ponder_steps": card.get("avg_ponder_steps", 0.0),
+        "corpus": card.get("corpus", ""),
+        "trained_at": card.get("trained_at", ""),
+        "training_cost_usd": card.get("training_cost_usd", 0.0),
+        "gpu": card.get("gpu", ""),
+        "notes": card.get("notes", ""),
     }
+
+
+@app.get("/status")
+def status():
+    return _status_payload()
 
 
 @app.post("/reload")
 def reload_model():
     """Reload model weights and vocab from disk without restarting the server."""
     load_model()
-    return {
-        "loaded": model_state["loaded"],
-        "error": model_state["error"],
-        "vocab_size": model_state["vocab_size"],
-        "corpus_books": model_state["corpus_books"],
-        "iterations": model_state["iterations"],
-        "message": "Model reloaded from disk",
-    }
+    payload = _status_payload()
+    payload["message"] = "Model reloaded from disk"
+    return payload
 
 
 @app.post("/chat")

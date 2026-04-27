@@ -216,10 +216,11 @@ body{display:flex;flex-direction:column}
       <span id="statusText">connecting...</span>
     </div>
   </div>
-  <div class="stats-bar">
+  <div class="stats-bar" title="Hover for training details">
+    <div class="stat">model <b id="statModel">—</b></div>
     <div class="stat">vocab <b id="statVocab">—</b></div>
-    <div class="stat">books <b id="statBooks">—</b></div>
-    <div class="stat">iters <b id="statIters">—</b></div>
+    <div class="stat">arch <b id="statArch">—</b></div>
+    <div class="stat">loss <b id="statLoss">—</b></div>
   </div>
 </div>
 
@@ -451,9 +452,22 @@ async function fetchStatus(){
       statusDot.className='status-dot err';
       statusText.textContent=d.error||'not loaded';
     }
+    document.getElementById('statModel').textContent=d.active_model||'\u2014';
     document.getElementById('statVocab').textContent=d.vocab_size?d.vocab_size.toLocaleString():'\u2014';
-    document.getElementById('statBooks').textContent=d.corpus_books||'\u2014';
-    document.getElementById('statIters').textContent=d.iterations||'\u2014';
+    const arch=d.n_layers&&d.embed_dim?`${d.n_layers}L\u00b7${d.embed_dim}D${d.use_rope?'\u00b7RoPE':''}`:'\u2014';
+    document.getElementById('statArch').textContent=arch;
+    document.getElementById('statLoss').textContent=d.final_loss?d.final_loss.toFixed(4):'\u2014';
+
+    // Tooltip with full training details
+    const tt=[];
+    if(d.epochs)tt.push(`${d.epochs} epoch${d.epochs===1?'':'s'}`);
+    if(d.corpus)tt.push(`corpus: ${d.corpus}`);
+    if(d.gpu)tt.push(`gpu: ${d.gpu}`);
+    if(d.training_cost_usd)tt.push(`cost: $${d.training_cost_usd.toFixed(2)}`);
+    if(d.avg_ponder_steps)tt.push(`avg ponder: ${d.avg_ponder_steps.toFixed(1)}`);
+    if(d.trained_at)tt.push(`trained: ${d.trained_at}`);
+    if(d.notes)tt.push(`\n${d.notes}`);
+    document.querySelector('.stats-bar').title=tt.join(' \u00b7 ');
   }catch{
     statusDot.className='status-dot err';
     statusText.textContent='offline';

@@ -1,0 +1,17 @@
+{
+  "model": "v6_preln",
+  "trained_at": "2026-04-27T03:42:28+00:00",
+  "epochs": 3,
+  "final_loss": 1.0509,
+  "avg_ponder_steps": 3.0,
+  "corpus": "15 MB local (Gutenberg novels + dailydialog)",
+  "corpus_files": 14,
+  "architecture": "Pre-LN + RoPE + AdamW(wd=0.01)",
+  "embed_dim": 256,
+  "n_layers": 8,
+  "n_heads": 8,
+  "context_size": 32,
+  "training_cost_usd": 3.6,
+  "gpu": "Modal L4",
+  "notes": "Architecture fix for v5 mode collapse — Pre-LN + AdamW broke the constant-output bug. Diagnostic confirms cosine 1.000→0.960 and ||Δ|| 1e-7→0.43 between distinct prompts. Quality still gibberish-grade due to corpus contamination from 19th-c novels."
+}
