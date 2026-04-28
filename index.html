@@ -121,41 +121,46 @@ a:hover{text-decoration:underline}
   <div class="header">
     <div>
       <div class="logo">engram</div>
-      <div class="subtitle">v4_rope · Status Report</div>
+      <div class="subtitle">v9_dialog_big · Status Report</div>
     </div>
     <div class="header-right">
       <a class="chat-link" href="http://108.181.97.223:5000" target="_blank">
         Try Engram →
       </a>
-      <span class="updated">Updated: 2026-04-26 01:30 UTC</span>
+      <span class="updated">Updated: 2026-04-28 20:00 UTC</span>
     </div>
   </div>
 
   <!-- Honest status banner -->
-  <div class="card" style="margin-bottom:24px;border:1px solid var(--green)">
-    <div class="card-title" style="color:var(--green)">✅ Status — Real English Words! (Sentences Still Need Work)</div>
+  <div class="card" style="margin-bottom:24px;border:1px solid var(--yellow)">
+    <div class="card-title" style="color:var(--yellow)">Status — More Params Did Not Fix Grammar. Data Is the Bottleneck.</div>
     <p style="font-size:0.9rem;line-height:1.6">
-      Update 2026-04-28: <strong>v8 trained on cleaned dailydialog</strong> (regex-stripped numeric
-      IDs, replaced low-frequency tokens with <span class="mono">&lt;unk&gt;</span>, 5 epochs on
-      L4, ~$3). Final loss <strong>1.0044</strong> — best yet (v7: 1.0101, v6: 1.0509). Vocab
-      shrunk to <strong>9,509 concepts</strong> (v7: 18,187, v6: 38,062). Diagnostic:
-      <span class="mono">cos(p1, p2) = 0.780</span> (was 0.912 in v7) — model output is significantly more
-      input-conditioned than any previous version.
+      Update 2026-04-28: <strong>v9_dialog_big deployed live</strong> — 384 embed dim / 12 layers / 12 heads / RoPE / Pre-LN / AdamW.
+      <strong>21.5M brain params</strong> (vs v8's ~6M). Same cleaned dailydialog corpus (9,509-token vocab). 5 epochs on Modal L4, ~$4.
+      Trained 2026-04-28 12:32 UTC, live as of 2026-04-28 19:50 UTC.
     </p>
     <p style="font-size:0.9rem;line-height:1.6;margin-top:8px">
-      <strong>Major qualitative improvement.</strong> All 16 eval prompts produce distinct replies
-      with <strong>only real English words</strong> — no more numeric IDs (<span class="mono">236, yw132, 8826789</span>)
-      or placeholder gibberish (<span class="mono">rikknen, bidpai, morrissette</span>). Every output
-      token is a recognizable English word. Sample replies:
-      <span class="mono small">"and tonight user good guy it and the z representatives i playstation complicated kiss"</span>,
-      <span class="mono small">"and good i earn you it and freckles needs ming i saver happens"</span>.
+      <strong>Eval results (eval_chat.py, 16 prompts):</strong>
+      Criterion 1 (distinct outputs per prompt) — <strong style="color:var(--green)">PASS</strong>, 16/16 distinct.
+      Criterion 2 (≥80% real-English tokens) — <strong style="color:var(--yellow)">mostly pass</strong>, real English words
+      but with odd vocab leaks (<span class="mono">ikebana, milliken, tornados, banquet</span>).
+      Criterion 3 (≥3/5 chitchat replies coherent) — <strong style="color:var(--red)">FAIL</strong>, still word salad.
     </p>
     <p style="font-size:0.9rem;line-height:1.6;margin-top:8px">
-      <strong>What's still missing</strong>: word salad of valid words rather than coherent sentences.
-      Topics drift mid-sentence (<span class="mono">tonight, playstation, kiss</span> in one reply),
-      grammar is broken, no syntactic structure. Architecture and data pipeline are healthy now —
-      next test is whether <strong>v9 (bigger model, 50M params)</strong> has the capacity to learn
-      multi-word grammatical patterns instead of just word-level associations.
+      Sample replies from eval transcript
+      (<span class="mono small">eval_runs/chat_20260428_194533.json</span>):
+      <br><span class="mono small">USER: "what do you like to do" → BOT: "you go to banquet present the bot smoke and starting i ll failed to the"</span>
+      <br><span class="mono small">USER: "tell me about yourself" → BOT: "user reducing that happening slip i m it evil banquet bot you cortex it s"</span>
+      <br><span class="mono small">USER: "how was your day" → BOT: "user reducing the me that i m dishwashing hi evil bot you festival it s"</span>
+    </p>
+    <p style="font-size:0.9rem;line-height:1.6;margin-top:8px">
+      <strong>Diagnosis:</strong> 3.5× more parameters on the same dailydialog corpus did not crack grammar.
+      Fragments emerge (<span class="mono">i am, i m, hi, i have a really</span>) but no coherent multi-word sentences.
+      The v8 hypothesis ("capacity is the bottleneck") is refuted — the bottleneck is <strong>corpus size and variety</strong>,
+      not model capacity. The cleaned dailydialog file (~6 MB, ~76K utterances) is too small and too repetitive
+      for a 21.5M-param model to learn syntactic structure from. Next step: <strong>v10</strong> — same bigger model
+      plus <a href="https://huggingface.co/datasets/HuggingFaceTB/everyday-conversations-llama3.1-2k">everyday-conversations-llama3.1-2k</a>
+      merged into the corpus via <span class="mono">download_everyday_conversations.py</span>.
     </p>
   </div>
 
@@ -166,14 +171,14 @@ a:hover{text-decoration:underline}
     <div class="card">
       <div class="card-title">Active Deployment</div>
       <div class="score-gauge">
-        <div><span class="score-big" style="font-size:2.5rem;color:var(--cyan)">v8_clean</span></div>
-        <div><span class="status-badge" style="background:var(--green);color:#fff">LIVE · ENGLISH WORDS</span></div>
-        <div class="score-ts">Trained 2026-04-28 02:16 UTC · Modal L4 GPU</div>
+        <div><span class="score-big" style="font-size:2.1rem;color:var(--cyan)">v9_dialog_big</span></div>
+        <div><span class="status-badge" style="background:var(--yellow);color:#000">LIVE · WORD SALAD</span></div>
+        <div class="score-ts">Trained 2026-04-28 12:32 UTC · Modal L4 GPU · ~$4</div>
         <div class="failure-tags" style="justify-content:center;margin-top:10px">
           <span class=tag style="border-color:var(--green);color:var(--green)">Pre-LN</span>
           <span class=tag style="border-color:var(--green);color:var(--green)">AdamW</span>
           <span class=tag style="border-color:var(--green);color:var(--green)">RoPE</span>
-          <span class=tag style="border-color:var(--green);color:var(--green)">cleaned corpus</span>
+          <span class=tag style="border-color:var(--green);color:var(--green)">21.5M params</span>
           <span class=tag style="border-color:var(--yellow);color:var(--yellow)">no syntax yet</span>
         </div>
       </div>
@@ -181,26 +186,26 @@ a:hover{text-decoration:underline}
 
     <!-- Training metrics -->
     <div class="card">
-      <div class="card-title">v4 Training Metrics</div>
+      <div class="card-title">v9 Training Metrics</div>
       <div class="sub-score-row">
-        <span class="sub-label muted">final loss</span>
-        <div class="bar-track"><div class="bar-fill" style="width:75%;background:var(--green)"></div></div>
-        <span class="sub-val mono" style="color:var(--green)">1.1347</span>
+        <span class="sub-label muted">distinct</span>
+        <div class="bar-track"><div class="bar-fill" style="width:100%;background:var(--green)"></div></div>
+        <span class="sub-val mono" style="color:var(--green)">16/16</span>
       </div>
       <div class="sub-score-row">
-        <span class="sub-label muted">grad p99</span>
-        <div class="bar-track"><div class="bar-fill" style="width:65%;background:var(--green)"></div></div>
-        <span class="sub-val mono" style="color:var(--green)">0.28</span>
+        <span class="sub-label muted">english</span>
+        <div class="bar-track"><div class="bar-fill" style="width:75%;background:var(--yellow)"></div></div>
+        <span class="sub-val mono" style="color:var(--yellow)">mostly</span>
       </div>
       <div class="sub-score-row">
-        <span class="sub-label muted">epochs</span>
-        <div class="bar-track"><div class="bar-fill" style="width:20%;background:var(--red)"></div></div>
-        <span class="sub-val mono" style="color:var(--red)">1 / 5+</span>
+        <span class="sub-label muted">coherent</span>
+        <div class="bar-track"><div class="bar-fill" style="width:5%;background:var(--red)"></div></div>
+        <span class="sub-val mono" style="color:var(--red)">0/5</span>
       </div>
       <div class="sub-score-row">
         <span class="sub-label muted">eval</span>
-        <div class="bar-track"><div class="bar-fill" style="width:5%;background:var(--red)"></div></div>
-        <span class="sub-val mono" style="color:var(--red)">FAIL</span>
+        <div class="bar-track"><div class="bar-fill" style="width:33%;background:var(--red)"></div></div>
+        <span class="sub-val mono" style="color:var(--red)">1/3</span>
       </div>
     </div>
 
@@ -215,27 +220,31 @@ a:hover{text-decoration:underline}
     </div>
     <div class="info-row">
       <span class="info-key">Active model</span>
-      <span class="info-val mono" style="color:var(--cyan)">v4_rope</span>
+      <span class="info-val mono" style="color:var(--cyan)">v9_dialog_big</span>
     </div>
     <div class="info-row">
       <span class="info-key">Architecture</span>
-      <span class="info-val mono">8L · 256D · 8H · ctx=32 · RoPE</span>
+      <span class="info-val mono">12L · 384D · 12H · head_dim=32 · RoPE · Pre-LN</span>
     </div>
     <div class="info-row">
       <span class="info-key">Brain params</span>
-      <span class="info-val mono">6,318,849 (+ 12.9M N-gram tables)</span>
+      <span class="info-val mono">21,288,577 (~21.5M)</span>
     </div>
     <div class="info-row">
       <span class="info-key">Vocab size</span>
-      <span class="info-val mono">38,062</span>
+      <span class="info-val mono">9,509 (cleaned dailydialog)</span>
     </div>
     <div class="info-row">
       <span class="info-key">Corpus</span>
-      <span class="info-val mono">15 MB · 14 books + dailydialog</span>
+      <span class="info-val mono">dailydialog_clean.txt · ~6 MB</span>
     </div>
     <div class="info-row">
-      <span class="info-key">Training loss</span>
-      <span class="info-val mono">1.1347 (avg, 1 epoch)</span>
+      <span class="info-key">Training</span>
+      <span class="info-val mono">5 epochs · Modal L4 · ~$4 · 2026-04-28 12:32 UTC</span>
+    </div>
+    <div class="info-row">
+      <span class="info-key">Live since</span>
+      <span class="info-val mono">2026-04-28 19:50 UTC</span>
     </div>
     <div class="info-row">
       <span class="info-key">Platform</span>
@@ -404,39 +413,35 @@ a:hover{text-decoration:underline}
 
   <!-- Logical next steps -->
   <div class="card" style="margin-bottom:24px">
-    <div class="card-title">Logical Next Steps (in order)</div>
+    <div class="card-title">Logical Next Steps (updated 2026-04-28)</div>
     <ol style="font-size:0.9rem;line-height:1.8;padding-left:24px">
       <li>
-        <strong>Sanity-check the eval pipeline first.</strong> Before spending more compute,
-        dump the raw concept prediction (pre-nearest-word) for two different prompts and
-        confirm they actually differ. If predictions are identical → it's a generation/serving bug,
-        not undertraining; cheaper to fix code than train more. (~30 min, $0.)
+        <strong>v10 — bigger corpus (in progress).</strong>
+        v9 proved capacity alone is not sufficient. The cleaned dailydialog corpus (~6 MB, ~76K utterances)
+        is too small and too repetitive for a 21.5M-param model to learn grammar from.
+        v10 merges <a href="https://huggingface.co/datasets/HuggingFaceTB/everyday-conversations-llama3.1-2k">HuggingFaceTB/everyday-conversations-llama3.1-2k</a>
+        (clean Llama-generated dialogs) into <span class="mono">dailydialog_clean.txt</span> via
+        <span class="mono">download_everyday_conversations.py</span>. Same 21.5M-param architecture.
+        Target: training kicks off shortly after v9 deployment (~$4–5 on L4).
       </li>
       <li>
-        <strong>Add real eval metrics.</strong> Replace the random-embedding
-        <span class="mono">eval_cosine_top1</span> with held-out perplexity on actual ChromaDB
-        embeddings. The bench's 5.0% plateau across every architectural variant strongly suggests
-        the metric is broken. (~1h, $0.)
+        <strong>Evaluate corpus size effect explicitly.</strong>
+        After v10, compare eval results against v9. If coherence improves, data variety is
+        confirmed as the bottleneck and the next increment is adding more open-license dialog corpora
+        (Persona-Chat, OpenAssistant subsets, WildChat). If v10 still fails, look at training
+        duration (more epochs) before adding more data sources.
       </li>
       <li>
-        <strong>Run v5: more epochs + balance the corpus.</strong> 5 epochs, drop the heaviest
-        archaic-vocab books (Moby Dick, Pride and Prejudice), keep dailydialog as the primary
-        signal. ~6h on L4, ~$5. Re-run eval. If gibberish persists → it's a model-capacity issue.
+        <strong>Only scale model further if data is addressed first.</strong>
+        v9 → v8 → v7 → v6 all used the same architecture improvements, each confirmed useful.
+        Going wider/deeper without expanding the corpus would repeat the v9 mistake.
+        Target: 50M+ params only once corpus size is at least 20 MB of clean dialog.
       </li>
       <li>
-        <strong>If v5 is better but still rough → v6 (bigger model).</strong>
-        384-dim, 12 layers, ~50M params. RoPE has already shown it stabilizes gradient at this
-        scale. ~12h on A10G, ~$13.
-      </li>
-      <li>
-        <strong>If v6 works → v7 (real conversational corpus).</strong> Add Reddit conversations,
-        persona-chat, OpenAssistant — datasets that match the conversational format the model
-        is being judged on.
-      </li>
-      <li>
-        <strong>Architectural revisits.</strong> Some Phase 1–4 ideas may have failed because
-        they were tested on an undertrained baseline. Worth re-evaluating LTI and per-loop LoRA
-        at v6+ scale where they're more likely to matter.
+        <strong>Architectural revisits at larger scale.</strong>
+        Some Phase 1–4 OpenMythos ideas (LTI injection, per-loop LoRA) were killed on an
+        undertrained baseline. Worth re-evaluating once a model actually achieves coherent chitchat —
+        there may be gains available at that point that weren't visible at word-salad quality.
       </li>
     </ol>
   </div>
@@ -455,9 +460,27 @@ a:hover{text-decoration:underline}
       </thead>
       <tbody>
         <tr>
+          <td class="mono muted">2026-04-28 (v10)</td>
+          <td class="mono" style="color:var(--purple)">v10_dialog_big</td>
+          <td><span class="badge" style="color:var(--purple);border-color:var(--purple)">PLANNED</span></td>
+          <td class="muted small">v9 arch + everyday-conversations-llama3.1-2k merged corpus; training pending</td>
+        </tr>
+        <tr>
+          <td class="mono muted">2026-04-28 19:50</td>
+          <td class="mono" style="color:var(--cyan)">v9_dialog_big</td>
+          <td><span class="badge" style="color:var(--yellow);border-color:var(--yellow)">LIVE · WORD SALAD</span></td>
+          <td class="muted small">21.5M params · 12L · 384D · 5 epochs · ~$4 · eval 1/3 criteria: distinct PASS, english mostly, coherent FAIL</td>
+        </tr>
+        <tr>
+          <td class="mono muted">2026-04-28 02:16</td>
+          <td class="mono">v8_clean</td>
+          <td><span class="badge" style="color:var(--muted);border-color:var(--muted)">REPLACED</span></td>
+          <td class="muted small">cleaned corpus (9,509-token vocab) · 5 epochs · loss=1.0044 · real English words but word salad</td>
+        </tr>
+        <tr>
           <td class="mono muted">2026-04-26 01:18</td>
-          <td class="mono" style="color:var(--cyan)">v4_rope</td>
-          <td><span class="badge" style="color:var(--yellow);border-color:var(--yellow)">DEPLOYED · GIBBERISH</span></td>
+          <td class="mono">v4_rope</td>
+          <td><span class="badge" style="color:var(--muted);border-color:var(--muted)">REPLACED</span></td>
           <td class="muted small">1 epoch, 15 MB corpus, loss=1.1347, eval failed (see report)</td>
         </tr>
         <tr>
@@ -503,7 +526,7 @@ a:hover{text-decoration:underline}
   <!-- Footer -->
   <div class="footer">
     <p>engram is an experimental neural language model with adaptive pondering, N-gram memory, and continuous-concept vocabulary. <a href="https://github.com/kent-ai-dev/engram" target="_blank">GitHub</a></p>
-    <p style="margin-top:4px">Status report manually generated 2026-04-26.</p>
+    <p style="margin-top:4px">Status report updated 2026-04-28.</p>
   </div>
 
 </div>
