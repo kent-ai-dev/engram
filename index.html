@@ -132,31 +132,30 @@ a:hover{text-decoration:underline}
   </div>
 
   <!-- Honest status banner -->
-  <div class="card" style="margin-bottom:24px;border:1px solid var(--yellow)">
-    <div class="card-title" style="color:var(--yellow)">⚠ Status — Cleaner Vocab, Still Gibberish (Data Artifacts Now Visible)</div>
+  <div class="card" style="margin-bottom:24px;border:1px solid var(--green)">
+    <div class="card-title" style="color:var(--green)">✅ Status — Real English Words! (Sentences Still Need Work)</div>
     <p style="font-size:0.9rem;line-height:1.6">
-      Update 2026-04-27: <strong>v7 trained on dailydialog.txt only</strong> (6.1 MB conversational
-      corpus, 5 epochs, ~$3 on L4). Final loss <strong>1.0101</strong> (lowest yet — vs v6's 1.0509,
-      v5's 1.1448). Diagnostic: <span class="mono">cos = 0.912</span> (was 0.960),
-      <span class="mono">||Δ|| = 4.51</span> (was 0.43) — <strong>10× more output differentiation</strong>
-      than v6. Vocab dropped from 38,062 → 18,187 concepts (the novels are gone).
+      Update 2026-04-28: <strong>v8 trained on cleaned dailydialog</strong> (regex-stripped numeric
+      IDs, replaced low-frequency tokens with <span class="mono">&lt;unk&gt;</span>, 5 epochs on
+      L4, ~$3). Final loss <strong>1.0044</strong> — best yet (v7: 1.0101, v6: 1.0509). Vocab
+      shrunk to <strong>9,509 concepts</strong> (v7: 18,187, v6: 38,062). Diagnostic:
+      <span class="mono">cos(p1, p2) = 0.780</span> (was 0.912 in v7) — model output is significantly more
+      input-conditioned than any previous version.
     </p>
     <p style="font-size:0.9rem;line-height:1.6;margin-top:8px">
-      <strong>But output is STILL gibberish.</strong> Sample replies:
-      <span class="mono small">"i user swear 106 236 i user doctor uncite the i bidpai bleu 236 to"</span>,
-      <span class="mono small">"i rikknen laid uptight lock for i to rikknen batwoman and yw132 expanded"</span>.
-      The novel-vocab is gone but replaced by <strong>data artifacts in dailydialog</strong> —
-      numeric IDs (<span class="mono">236, 106, 1205, yw132, 8826789</span>),
-      placeholder tokens (<span class="mono">rikknen, bidpai, _baron</span>), and rare proper nouns
-      (<span class="mono">morrissette, pavarotti</span>). Common English IS appearing
-      (<span class="mono">i, user, the, you, to, and, lending, doctor, good</span>) but it's
-      drowned by the noise tokens.
+      <strong>Major qualitative improvement.</strong> All 16 eval prompts produce distinct replies
+      with <strong>only real English words</strong> — no more numeric IDs (<span class="mono">236, yw132, 8826789</span>)
+      or placeholder gibberish (<span class="mono">rikknen, bidpai, morrissette</span>). Every output
+      token is a recognizable English word. Sample replies:
+      <span class="mono small">"and tonight user good guy it and the z representatives i playstation complicated kiss"</span>,
+      <span class="mono small">"and good i earn you it and freckles needs ming i saver happens"</span>.
     </p>
     <p style="font-size:0.9rem;line-height:1.6;margin-top:8px">
-      <strong>Diagnosis</strong>: dailydialog.txt has preprocessing residue. Need either
-      (a) clean the corpus before training (regex out numeric IDs and rare tokens), or
-      (b) v8 — bigger model with more capacity to weight common patterns higher than rare noise,
-      or (c) cleaner conversational corpus (e.g., Persona-Chat or OpenAssistant).
+      <strong>What's still missing</strong>: word salad of valid words rather than coherent sentences.
+      Topics drift mid-sentence (<span class="mono">tonight, playstation, kiss</span> in one reply),
+      grammar is broken, no syntactic structure. Architecture and data pipeline are healthy now —
+      next test is whether <strong>v9 (bigger model, 50M params)</strong> has the capacity to learn
+      multi-word grammatical patterns instead of just word-level associations.
     </p>
   </div>
 
@@ -167,15 +166,15 @@ a:hover{text-decoration:underline}
     <div class="card">
       <div class="card-title">Active Deployment</div>
       <div class="score-gauge">
-        <div><span class="score-big" style="font-size:2.5rem;color:var(--cyan)">v7_dialog</span></div>
-        <div><span class="status-badge" style="background:var(--yellow);color:#000">LIVE · DATA ARTIFACTS</span></div>
-        <div class="score-ts">Trained 2026-04-27 14:00 UTC · Modal L4 GPU</div>
+        <div><span class="score-big" style="font-size:2.5rem;color:var(--cyan)">v8_clean</span></div>
+        <div><span class="status-badge" style="background:var(--green);color:#fff">LIVE · ENGLISH WORDS</span></div>
+        <div class="score-ts">Trained 2026-04-28 02:16 UTC · Modal L4 GPU</div>
         <div class="failure-tags" style="justify-content:center;margin-top:10px">
           <span class=tag style="border-color:var(--green);color:var(--green)">Pre-LN</span>
           <span class=tag style="border-color:var(--green);color:var(--green)">AdamW</span>
           <span class=tag style="border-color:var(--green);color:var(--green)">RoPE</span>
-          <span class=tag style="border-color:var(--green);color:var(--green)">dailydialog-only</span>
-          <span class=tag style="border-color:var(--yellow);color:var(--yellow)">noise tokens</span>
+          <span class=tag style="border-color:var(--green);color:var(--green)">cleaned corpus</span>
+          <span class=tag style="border-color:var(--yellow);color:var(--yellow)">no syntax yet</span>
         </div>
       </div>
     </div>

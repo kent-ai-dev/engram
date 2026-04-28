@@ -30,7 +30,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Active model: v4_rope (8L/256D/RoPE, trained 2026-04-25 on Modal L4).
 # To roll back to large_iter4 (older, smaller, no RoPE), change ACTIVE_MODEL.
-ACTIVE_MODEL = "v7_dialog"
+ACTIVE_MODEL = "v8_clean"
 _model_dir = os.path.join(BASE_DIR, "models", ACTIVE_MODEL)
 if os.path.exists(os.path.join(_model_dir, "engram_weights.pth")):
     WEIGHTS_PATH = os.path.join(_model_dir, "engram_weights.pth")
