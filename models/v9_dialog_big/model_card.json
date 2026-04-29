@@ -1,0 +1,18 @@
+{
+  "name": "v9_dialog_big",
+  "architecture": "AttentionBrain (Pre-LN + AdamW + RoPE), bigger model on cleaned dailydialog",
+  "embed_dim": 384,
+  "n_layers": 12,
+  "n_heads": 12,
+  "context_size": 32,
+  "vocab_size": 9509,
+  "brain_params": 21509761,
+  "epochs": 5,
+  "final_loss": null,
+  "avg_ponder_steps": null,
+  "corpus": "dailydialog_clean.txt (regex-stripped numeric IDs, low-freq → <unk>)",
+  "trained_at": "2026-04-28T12:32:00Z",
+  "training_cost_usd": 4.0,
+  "gpu": "Modal L4",
+  "notes": "v8 stayed at 256D/8L on the same cleaned corpus and produced real-English word-salad. v9 scales to 384D/12L/12H (~21.5M brain params) to test whether more capacity yields multi-word grammar. Head_dim=32, RoPE max_seq_len=128. Eval pending."
+}

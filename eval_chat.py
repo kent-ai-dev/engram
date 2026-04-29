@@ -170,16 +170,26 @@ def main():
     print(f"Loading brain from {WEIGHTS_PATH}...")
     state_dict = torch.load(WEIGHTS_PATH, weights_only=True)
     use_rope = any(k.startswith("blocks.") and k.endswith(".freqs_cis") for k in state_dict)
-    brain = AttentionBrain(embed_dim=EMBED_DIM, context_size=CONTEXT_SIZE, n_layers=N_LAYERS, use_rope=use_rope)
+    embed_dim = state_dict["ln_final.weight"].shape[0]
+    context_size = state_dict["pos_embed.weight"].shape[0]
+    n_layers = max(int(k.split(".")[1]) for k in state_dict if k.startswith("blocks.")) + 1
+    if use_rope and "blocks.0.freqs_cis" in state_dict:
+        head_dim = state_dict["blocks.0.freqs_cis"].shape[1] * 2
+        n_heads = embed_dim // head_dim
+    else:
+        n_heads = 8
+    brain = AttentionBrain(embed_dim=embed_dim, context_size=context_size,
+                           n_layers=n_layers, use_rope=use_rope, n_heads=n_heads)
     brain.load_state_dict(state_dict, strict=False)
     brain.eval()
     brain_params = sum(p.numel() for p in brain.parameters())
-    print(f"  brain_params={brain_params:,}, use_rope={use_rope}")
+    print(f"  embed_dim={embed_dim}, n_layers={n_layers}, n_heads={n_heads}, "
+          f"brain_params={brain_params:,}, use_rope={use_rope}")
 
     engram_module = None
     word_to_id = None
     if os.path.exists(ENGRAM_PATH) and os.path.exists(W2ID_PATH):
-        engram_module = EngramModule(EMBED_DIM)
+        engram_module = EngramModule(embed_dim)
         engram_module.load_state_dict(torch.load(ENGRAM_PATH, weights_only=True))
         word_to_id = torch.load(W2ID_PATH, weights_only=False)
         engram_module.eval()

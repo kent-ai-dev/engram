@@ -1,0 +1,18 @@
+{
+  "_comment": "v11: corpus expansion via smol-smoltalk subsample. Same v9/v10 architecture (proven). EPOCHS dropped to 4 to fit ~17 MB combined corpus in 5h L4 budget. NGRAM_TABLE_SIZE bumped to 100003 because combined vocab will exceed 9509 (estimated 12-15k after rare-merge across 3 corpora). Stage this config but do not upload until v10 fails — if v10 cracks coherence we ship v10 instead.",
+  "EMBED_DIM": 384,
+  "N_LAYERS": 12,
+  "CONTEXT_SIZE": 32,
+  "N_HEADS": 12,
+  "BATCH_SIZE": 96,
+  "BRAIN_LR": 1e-3,
+  "EMBED_LR": 5e-4,
+  "EPOCHS": 4,
+  "CHROMA_PATH": "./engram_memory",
+  "NGRAM_TABLE_SIZE": 100003,
+  "BOOKS": [
+    "corpus/dailydialog_clean.txt",
+    "corpus/everyday_conversations.txt",
+    "corpus/smol_smoltalk_subset.txt"
+  ]
+}

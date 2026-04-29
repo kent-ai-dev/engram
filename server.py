@@ -28,9 +28,9 @@ TEMPERATURE = 0.9
 TOP_K = 10
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Active model: v4_rope (8L/256D/RoPE, trained 2026-04-25 on Modal L4).
-# To roll back to large_iter4 (older, smaller, no RoPE), change ACTIVE_MODEL.
-ACTIVE_MODEL = "v8_clean"
+# Active model: v9_dialog_big (12L/384D/12H/RoPE, trained 2026-04-28 on Modal L4).
+# To roll back, change ACTIVE_MODEL to a previous models/<variant> dir.
+ACTIVE_MODEL = "v9_dialog_big"
 _model_dir = os.path.join(BASE_DIR, "models", ACTIVE_MODEL)
 if os.path.exists(os.path.join(_model_dir, "engram_weights.pth")):
     WEIGHTS_PATH = os.path.join(_model_dir, "engram_weights.pth")
@@ -189,9 +189,15 @@ def load_model():
             int(k.split(".")[1]) for k in state_dict if k.startswith("blocks.")
         ) + 1
         use_rope = any(k.startswith("blocks.") and k.endswith(".freqs_cis") for k in state_dict)
+        # head_dim is encoded in freqs_cis as (max_seq_len, head_dim // 2)
+        if use_rope and "blocks.0.freqs_cis" in state_dict:
+            head_dim = state_dict["blocks.0.freqs_cis"].shape[1] * 2
+            n_heads = embed_dim // head_dim
+        else:
+            n_heads = 8
 
         brain = AttentionBrain(embed_dim=embed_dim, context_size=context_size,
-                               n_layers=n_layers, use_rope=use_rope)
+                               n_layers=n_layers, use_rope=use_rope, n_heads=n_heads)
         brain.load_state_dict(state_dict, strict=False)
         brain.eval()
 
