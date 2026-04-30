@@ -121,46 +121,57 @@ a:hover{text-decoration:underline}
   <div class="header">
     <div>
       <div class="logo">engram</div>
-      <div class="subtitle">v9_dialog_big · Status Report</div>
+      <div class="subtitle">v10_dialog_corpus · Status Report</div>
     </div>
     <div class="header-right">
       <a class="chat-link" href="http://108.181.97.223:5000" target="_blank">
         Try Engram →
       </a>
-      <span class="updated">Updated: 2026-04-28 20:00 UTC</span>
+      <span class="updated">Updated: 2026-04-30 00:00 UTC</span>
     </div>
   </div>
 
   <!-- Honest status banner -->
   <div class="card" style="margin-bottom:24px;border:1px solid var(--yellow)">
-    <div class="card-title" style="color:var(--yellow)">Status — More Params Did Not Fix Grammar. Data Is the Bottleneck.</div>
+    <div class="card-title" style="color:var(--yellow)">Status — v10 Is Effectively a v9 Re-Run. The Corpus Expansion Hypothesis Was Not Tested.</div>
     <p style="font-size:0.9rem;line-height:1.6">
-      Update 2026-04-28: <strong>v9_dialog_big deployed live</strong> — 384 embed dim / 12 layers / 12 heads / RoPE / Pre-LN / AdamW.
-      <strong>21.5M brain params</strong> (vs v8's ~6M). Same cleaned dailydialog corpus (9,509-token vocab). 5 epochs on Modal L4, ~$4.
-      Trained 2026-04-28 12:32 UTC, live as of 2026-04-28 19:50 UTC.
+      Update 2026-04-30: <strong>v10_dialog_corpus deployed live</strong> — 384D / 12L / 12H / RoPE / Pre-LN / AdamW,
+      vocab=9,509, brain_params=21,509,761. Trained 2026-04-29 08:52 UTC on Modal L4, ~$4.
     </p>
     <p style="font-size:0.9rem;line-height:1.6;margin-top:8px">
-      <strong>Eval results (eval_chat.py, 16 prompts):</strong>
-      Criterion 1 (distinct outputs per prompt) — <strong style="color:var(--green)">PASS</strong>, 16/16 distinct.
+      <strong>The bug that invalidated v10 as an experiment:</strong>
+      v10 was launched on Modal with <span class="mono">BOOKS=["corpus/dailydialog_clean.txt", "corpus/everyday_conversations.txt"]</span>,
+      but <span class="mono">corpus/everyday_conversations.txt</span> was not committed to GitHub at the time of launch.
+      Modal training clones the repo from GitHub — the file was not in the container.
+      <span class="mono">ingest.py</span> line 134 silently filters missing paths:
+      <span class="mono">corpus_files = [b for b in args.books if os.path.exists(b)]</span>.
+      Result: v10 trained on <span class="mono">dailydialog_clean.txt</span> only — the exact same corpus as v9.
+      Confirmed by vocab_size=9,509 — bit-identical to v9. A real corpus expansion would have changed it.
+      <strong>v10 is effectively a v9 re-run with a different random seed. $4 of Modal time was wasted.</strong>
+    </p>
+    <p style="font-size:0.9rem;line-height:1.6;margin-top:8px">
+      <strong>Eval results (eval_chat.py, 16 prompts — eval_runs/chat_20260429_200824.json):</strong>
+      Criterion 1 (distinct outputs) — <strong style="color:var(--green)">PASS</strong>, 16/16 distinct.
       Criterion 2 (≥80% real-English tokens) — <strong style="color:var(--yellow)">mostly pass</strong>, real English words
-      but with odd vocab leaks (<span class="mono">ikebana, milliken, tornados, banquet</span>).
+      but with odd tokens like <span class="mono">kramer, wisconsin, interpersonal</span>.
       Criterion 3 (≥3/5 chitchat replies coherent) — <strong style="color:var(--red)">FAIL</strong>, still word salad.
+      Fragments are marginally more grammatical than v9 ("you re a", "i don t", "i ve have", "i m a") but no coherent sentences.
     </p>
     <p style="font-size:0.9rem;line-height:1.6;margin-top:8px">
       Sample replies from eval transcript
-      (<span class="mono small">eval_runs/chat_20260428_194533.json</span>):
-      <br><span class="mono small">USER: "what do you like to do" → BOT: "you go to banquet present the bot smoke and starting i ll failed to the"</span>
-      <br><span class="mono small">USER: "tell me about yourself" → BOT: "user reducing that happening slip i m it evil banquet bot you cortex it s"</span>
-      <br><span class="mono small">USER: "how was your day" → BOT: "user reducing the me that i m dishwashing hi evil bot you festival it s"</span>
+      (<span class="mono small">eval_runs/chat_20260429_200824.json</span>):
+      <br><span class="mono small">USER: "what do you like to do" → BOT: "user i have candles possess of the bot situations we have the candles for a"</span>
+      <br><span class="mono small">USER: "tell me about yourself" → BOT: "user oh seem that is hospitable i sticker possess managers bot it basil be i"</span>
+      <br><span class="mono small">USER: "do you have any friends" → BOT: "i shuttle that of unk i m do in my i can advertise bot it"</span>
     </p>
     <p style="font-size:0.9rem;line-height:1.6;margin-top:8px">
-      <strong>Diagnosis:</strong> 3.5× more parameters on the same dailydialog corpus did not crack grammar.
-      Fragments emerge (<span class="mono">i am, i m, hi, i have a really</span>) but no coherent multi-word sentences.
-      The v8 hypothesis ("capacity is the bottleneck") is refuted — the bottleneck is <strong>corpus size and variety</strong>,
-      not model capacity. The cleaned dailydialog file (~6 MB, ~76K utterances) is too small and too repetitive
-      for a 21.5M-param model to learn syntactic structure from. Next step: <strong>v10</strong> — same bigger model
-      plus <a href="https://huggingface.co/datasets/HuggingFaceTB/everyday-conversations-llama3.1-2k">everyday-conversations-llama3.1-2k</a>
-      merged into the corpus via <span class="mono">download_everyday_conversations.py</span>.
+      <strong>Lesson logged in <span class="mono">plans/V11_PLAN.md</span> pre-flight checklist:</strong>
+      "BOOKS files must be in HEAD before launch; verify with <span class="mono">git ls-tree HEAD corpus/</span>."
+      Next concrete step is a <strong>v10-redo</strong> — commit <span class="mono">everyday_conversations.txt</span>
+      first, then re-run with both corpora actually present. That will finally test the original corpus-expansion hypothesis.
+      v11 corpus expansion (smol-smoltalk, MultivexAI) is on hold — smol-smoltalk proved to be instruction-tuning data
+      (system prompts, code generation) rather than conversational; MultivexAI was only 30 KB of single-sentence utterances.
+      Neither is suitable. v11 corpus selection is TBD pending the v10-redo result.
     </p>
   </div>
 
@@ -171,14 +182,15 @@ a:hover{text-decoration:underline}
     <div class="card">
       <div class="card-title">Active Deployment</div>
       <div class="score-gauge">
-        <div><span class="score-big" style="font-size:2.1rem;color:var(--cyan)">v9_dialog_big</span></div>
-        <div><span class="status-badge" style="background:var(--yellow);color:#000">LIVE · WORD SALAD</span></div>
-        <div class="score-ts">Trained 2026-04-28 12:32 UTC · Modal L4 GPU · ~$4</div>
+        <div><span class="score-big" style="font-size:2.1rem;color:var(--cyan)">v10_dialog_corpus</span></div>
+        <div><span class="status-badge" style="background:var(--yellow);color:#000">LIVE · WORD SALAD (v9 re-run)</span></div>
+        <div class="score-ts">Trained 2026-04-29 08:52 UTC · Modal L4 GPU · ~$4</div>
         <div class="failure-tags" style="justify-content:center;margin-top:10px">
           <span class=tag style="border-color:var(--green);color:var(--green)">Pre-LN</span>
           <span class=tag style="border-color:var(--green);color:var(--green)">AdamW</span>
           <span class=tag style="border-color:var(--green);color:var(--green)">RoPE</span>
           <span class=tag style="border-color:var(--green);color:var(--green)">21.5M params</span>
+          <span class=tag style="border-color:var(--red);color:var(--red)">corpus bug</span>
           <span class=tag style="border-color:var(--yellow);color:var(--yellow)">no syntax yet</span>
         </div>
       </div>
@@ -186,7 +198,7 @@ a:hover{text-decoration:underline}
 
     <!-- Training metrics -->
     <div class="card">
-      <div class="card-title">v9 Training Metrics</div>
+      <div class="card-title">v10 Training Metrics</div>
       <div class="sub-score-row">
         <span class="sub-label muted">distinct</span>
         <div class="bar-track"><div class="bar-fill" style="width:100%;background:var(--green)"></div></div>
@@ -220,7 +232,7 @@ a:hover{text-decoration:underline}
     </div>
     <div class="info-row">
       <span class="info-key">Active model</span>
-      <span class="info-val mono" style="color:var(--cyan)">v9_dialog_big</span>
+      <span class="info-val mono" style="color:var(--cyan)">v10_dialog_corpus</span>
     </div>
     <div class="info-row">
       <span class="info-key">Architecture</span>
@@ -228,23 +240,23 @@ a:hover{text-decoration:underline}
     </div>
     <div class="info-row">
       <span class="info-key">Brain params</span>
-      <span class="info-val mono">21,288,577 (~21.5M)</span>
+      <span class="info-val mono">21,509,761</span>
     </div>
     <div class="info-row">
       <span class="info-key">Vocab size</span>
-      <span class="info-val mono">9,509 (cleaned dailydialog)</span>
+      <span class="info-val mono">9,509 (cleaned dailydialog — corpus bug, see notes)</span>
     </div>
     <div class="info-row">
       <span class="info-key">Corpus</span>
-      <span class="info-val mono">dailydialog_clean.txt · ~6 MB</span>
+      <span class="info-val mono" style="color:var(--yellow)">dailydialog_clean.txt only — corpus bug, see notes</span>
     </div>
     <div class="info-row">
       <span class="info-key">Training</span>
-      <span class="info-val mono">5 epochs · Modal L4 · ~$4 · 2026-04-28 12:32 UTC</span>
+      <span class="info-val mono">5 epochs · Modal L4 · ~$4 · 2026-04-29T08:52:00Z</span>
     </div>
     <div class="info-row">
-      <span class="info-key">Live since</span>
-      <span class="info-val mono">2026-04-28 19:50 UTC</span>
+      <span class="info-key">Training cost</span>
+      <span class="info-val mono">$4.00 (wasted — effectively v9 re-run)</span>
     </div>
     <div class="info-row">
       <span class="info-key">Platform</span>
@@ -413,35 +425,36 @@ a:hover{text-decoration:underline}
 
   <!-- Logical next steps -->
   <div class="card" style="margin-bottom:24px">
-    <div class="card-title">Logical Next Steps (updated 2026-04-28)</div>
+    <div class="card-title">Logical Next Steps (updated 2026-04-30)</div>
     <ol style="font-size:0.9rem;line-height:1.8;padding-left:24px">
       <li>
-        <strong>v10 — bigger corpus (in progress).</strong>
-        v9 proved capacity alone is not sufficient. The cleaned dailydialog corpus (~6 MB, ~76K utterances)
-        is too small and too repetitive for a 21.5M-param model to learn grammar from.
-        v10 merges <a href="https://huggingface.co/datasets/HuggingFaceTB/everyday-conversations-llama3.1-2k">HuggingFaceTB/everyday-conversations-llama3.1-2k</a>
-        (clean Llama-generated dialogs) into <span class="mono">dailydialog_clean.txt</span> via
-        <span class="mono">download_everyday_conversations.py</span>. Same 21.5M-param architecture.
-        Target: training kicks off shortly after v9 deployment (~$4–5 on L4).
+        <strong>v10-redo — run the experiment v10 was supposed to be.</strong>
+        The <span class="mono">everyday_conversations.txt</span> file is now committed to the repo.
+        Before any other change, re-run training with both
+        <span class="mono">dailydialog_clean.txt</span> and
+        <span class="mono">everyday_conversations.txt</span> actually present.
+        Pre-flight check: run <span class="mono">git ls-tree HEAD corpus/</span> and confirm both files appear
+        before launching Modal. Expected signal: if vocab_size changes from 9,509, the expanded corpus was ingested.
+        Same 21.5M-param architecture, same cost (~$4 on L4).
       </li>
       <li>
-        <strong>Evaluate corpus size effect explicitly.</strong>
-        After v10, compare eval results against v9. If coherence improves, data variety is
-        confirmed as the bottleneck and the next increment is adding more open-license dialog corpora
-        (Persona-Chat, OpenAssistant subsets, WildChat). If v10 still fails, look at training
-        duration (more epochs) before adding more data sources.
+        <strong>Evaluate corpus size effect after the redo.</strong>
+        Compare v10-redo eval against v9/v10. If coherence improves with the second corpus,
+        data variety is confirmed as the bottleneck and the path forward is adding more open-license
+        dialog corpora (Persona-Chat, OpenAssistant subsets, WildChat).
+        If the redo still fails, revisit training duration (more epochs) before adding more data.
+      </li>
+      <li>
+        <strong>v11 corpus selection is on hold.</strong>
+        smol-smoltalk was rejected — it is instruction-tuning data (system prompts, code generation,
+        meta-formatting), not conversational dialog. MultivexAI is only 30 KB of single-sentence
+        utterances — too small to help. No suitable v11 corpus has been identified yet.
+        TBD after the v10-redo result is in hand.
       </li>
       <li>
         <strong>Only scale model further if data is addressed first.</strong>
-        v9 → v8 → v7 → v6 all used the same architecture improvements, each confirmed useful.
-        Going wider/deeper without expanding the corpus would repeat the v9 mistake.
-        Target: 50M+ params only once corpus size is at least 20 MB of clean dialog.
-      </li>
-      <li>
-        <strong>Architectural revisits at larger scale.</strong>
-        Some Phase 1–4 OpenMythos ideas (LTI injection, per-loop LoRA) were killed on an
-        undertrained baseline. Worth re-evaluating once a model actually achieves coherent chitchat —
-        there may be gains available at that point that weren't visible at word-salad quality.
+        Going wider/deeper without a confirmed working corpus expansion would repeat the v9 mistake.
+        Target: 50M+ params only once a training run demonstrates improved coherence from a larger corpus.
       </li>
     </ol>
   </div>
@@ -460,15 +473,21 @@ a:hover{text-decoration:underline}
       </thead>
       <tbody>
         <tr>
-          <td class="mono muted">2026-04-28 (v10)</td>
-          <td class="mono" style="color:var(--purple)">v10_dialog_big</td>
-          <td><span class="badge" style="color:var(--purple);border-color:var(--purple)">PLANNED</span></td>
-          <td class="muted small">v9 arch + everyday-conversations-llama3.1-2k merged corpus; training pending</td>
+          <td class="mono muted">TBD</td>
+          <td class="mono" style="color:var(--purple)">v10-redo / v11</td>
+          <td><span class="badge" style="color:var(--purple);border-color:var(--purple)">PENDING · CORPUS TBD</span></td>
+          <td class="muted small">v10-redo: commit everyday_conversations.txt then re-run to actually test corpus expansion; v11 corpus selection on hold (smol-smoltalk and MultivexAI both unsuitable)</td>
+        </tr>
+        <tr>
+          <td class="mono muted">2026-04-29 08:52</td>
+          <td class="mono" style="color:var(--cyan)">v10_dialog_corpus</td>
+          <td><span class="badge" style="color:var(--yellow);border-color:var(--yellow)">LIVE · WORD SALAD (v9 re-run)</span></td>
+          <td class="muted small">corpus bug: everyday_conversations.txt not committed — trained on dailydialog only (same as v9); vocab=9,509 confirms no expansion; 21,509,761 params · ~$4 wasted</td>
         </tr>
         <tr>
           <td class="mono muted">2026-04-28 19:50</td>
-          <td class="mono" style="color:var(--cyan)">v9_dialog_big</td>
-          <td><span class="badge" style="color:var(--yellow);border-color:var(--yellow)">LIVE · WORD SALAD</span></td>
+          <td class="mono">v9_dialog_big</td>
+          <td><span class="badge" style="color:var(--muted);border-color:var(--muted)">REPLACED</span></td>
           <td class="muted small">21.5M params · 12L · 384D · 5 epochs · ~$4 · eval 1/3 criteria: distinct PASS, english mostly, coherent FAIL</td>
         </tr>
         <tr>
@@ -526,7 +545,7 @@ a:hover{text-decoration:underline}
   <!-- Footer -->
   <div class="footer">
     <p>engram is an experimental neural language model with adaptive pondering, N-gram memory, and continuous-concept vocabulary. <a href="https://github.com/kent-ai-dev/engram" target="_blank">GitHub</a></p>
-    <p style="margin-top:4px">Status report updated 2026-04-28.</p>
+    <p style="margin-top:4px">Status report updated 2026-04-30.</p>
   </div>
 
 </div>
