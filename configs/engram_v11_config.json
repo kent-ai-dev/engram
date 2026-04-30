@@ -1,5 +1,5 @@
 {
-  "_comment": "v11: corpus expansion via smol-smoltalk subsample. Same v9/v10 architecture (proven). EPOCHS dropped to 4 to fit ~17 MB combined corpus in 5h L4 budget. NGRAM_TABLE_SIZE bumped to 100003 because combined vocab will exceed 9509 (estimated 12-15k after rare-merge across 3 corpora). Stage this config but do not upload until v10 fails — if v10 cracks coherence we ship v10 instead.",
+  "_comment": "v11: the corpus-expansion experiment that v10 was supposed to run. Same v9/v10 architecture (proven). Combines two committed conversational corpora: dailydialog_clean.txt (3.6 MB, DailyDialog cleaned) + everyday_conversations.txt (1.7 MB, HuggingFaceTB/everyday-conversations-llama3.1-2k cleaned). Both are now in HEAD on origin/main, so Modal's repo clone will see them. EPOCHS=5 (corpus is 5.3 MB total — 50% bigger than v9's 3.6 MB, still fits 5h L4 timeout). NGRAM_TABLE_SIZE bumped to 100003 because combined vocab will exceed v9's 9509 (estimated 10-12k after rare-merge). smol-smoltalk dropped from this run — inspection showed it is instruction-tuning data with system prompts and code generation, wrong distribution for conversational coherence.",
   "EMBED_DIM": 384,
   "N_LAYERS": 12,
   "CONTEXT_SIZE": 32,
@@ -7,12 +7,11 @@
   "BATCH_SIZE": 96,
   "BRAIN_LR": 1e-3,
   "EMBED_LR": 5e-4,
-  "EPOCHS": 4,
+  "EPOCHS": 5,
   "CHROMA_PATH": "./engram_memory",
   "NGRAM_TABLE_SIZE": 100003,
   "BOOKS": [
     "corpus/dailydialog_clean.txt",
-    "corpus/everyday_conversations.txt",
-    "corpus/smol_smoltalk_subset.txt"
+    "corpus/everyday_conversations.txt"
   ]
 }
