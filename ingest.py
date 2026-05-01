@@ -441,6 +441,21 @@ def main():
 
         print(f"  Epoch {epoch + 1} complete ??? Avg Loss: {avg_loss:.4f} | Avg Ponder Steps: {avg_ponder:.2f}")
 
+        # Per-epoch checkpoint save — defense against subprocess/function timeout.
+        # Saves brain + engram + word_to_id every epoch; the final ChromaDB write
+        # at the bottom of training only happens on clean completion. If the run
+        # is killed mid-training, we still recover the most recent completed-epoch
+        # weights (without normalized embeddings — those get re-normalized at load).
+        try:
+            brain_state = {k: v.detach().cpu() for k, v in brain.state_dict().items()}
+            engram_state = {k: v.detach().cpu() for k, v in engram.state_dict().items()}
+            torch.save(brain_state, "engram_weights.pth")
+            torch.save(engram_state, "engram_memory_module.pth")
+            torch.save(word_to_id, "engram_word_to_id.pth")
+            print(f"  [checkpoint] saved post-epoch-{epoch + 1} weights to volume")
+        except Exception as ckpt_err:
+            print(f"  [checkpoint] WARNING: per-epoch save failed: {ckpt_err}")
+
 
 
     # Normalize embeddings before saving
