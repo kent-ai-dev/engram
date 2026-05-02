@@ -1,0 +1,17 @@
+{
+  "_comment": "v12: switch loss from MSE-on-embeddings to temperature-scaled cosine cross-entropy. Architecture and corpus frozen at v11 (controls). Single-variable test of the loss-function hypothesis. v9 refuted capacity, v11 refuted corpus volume; this tests the remaining structural choice that makes engram non-standard. Research: cross-entropy is universal for tokens; MSE on continuous embeddings rewards predicting average plausible neighbor (= word salad). All other hyperparameters identical to v11_dialog_2corpus.",
+  "EMBED_DIM": 384,
+  "N_LAYERS": 12,
+  "CONTEXT_SIZE": 32,
+  "N_HEADS": 12,
+  "BATCH_SIZE": 96,
+  "BRAIN_LR": 1e-3,
+  "EMBED_LR": 5e-4,
+  "EPOCHS": 5,
+  "CHROMA_PATH": "./engram_memory",
+  "NGRAM_TABLE_SIZE": 100003,
+  "BOOKS": [
+    "corpus/dailydialog_clean.txt",
+    "corpus/everyday_conversations.txt"
+  ]
+}

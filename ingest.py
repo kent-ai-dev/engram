@@ -307,12 +307,31 @@ def main():
 
     print(f"\nTraining: {len(sequences):,} sequences -> {n_batches:,} batches/epoch x {EPOCHS} epochs\n")
 
-
+    # v12 loss: temperature-scaled cosine cross-entropy against the full vocab.
+    # Replaces v6-v11's MSE-on-embeddings (which rewards predicting the average
+    # of plausible neighbors -> "word salad" failure mode confirmed across v8-v11).
+    # Build a global vocab matrix; refresh once per epoch from embed_cache so it
+    # tracks the slow drift from the per-batch write-back at the bottom of the loop.
+    vocab_words_global = list(embed_cache.keys())
+    word_to_global_idx = {w: i for i, w in enumerate(vocab_words_global)}
+    print(f"v12 cross-entropy mode: vocab_matrix shape = ({len(vocab_words_global):,}, {EMBED_DIM})")
+    vocab_matrix_global = torch.tensor(
+        [embed_cache[w] for w in vocab_words_global], dtype=torch.float32
+    ).to(DEVICE)
+    INV_TEMPERATURE = 10.0  # cosine sim in [-1,1]; scale up for sharper softmax (CLIP-style)
 
     brain.train()
     engram.train()
 
     for epoch in range(EPOCHS):
+
+        # Refresh vocab snapshot from embed_cache (which has drifted via per-batch write-back)
+        if epoch > 0:
+            with torch.no_grad():
+                vocab_matrix_global.copy_(torch.tensor(
+                    [embed_cache[w] for w in vocab_words_global], dtype=torch.float32
+                ).to(DEVICE))
+        vocab_matrix_normed = F.normalize(vocab_matrix_global, dim=-1)  # (V, D), constant for this epoch
 
         random.shuffle(sequences)
 
@@ -368,7 +387,8 @@ def main():
 
             ctx_embeds = batch_embed[ctx_idx]      # (B, T, D)
 
-            target_embeds = batch_embed[tgt_idx]   # (B, D)
+            # v12: target embeddings no longer needed (cross-entropy uses
+            # word_to_global_idx into vocab_matrix_normed, computed below).
 
             # Compute N-gram hashes for each sequence in the batch
             ngram_id_seqs = []
@@ -381,17 +401,23 @@ def main():
 
             predicted, ponder_steps = brain(ctx_embeds, ngram_memory=ngram_memory, engram_module=engram)
 
-            mse_loss = F.mse_loss(predicted, target_embeds)
+            # v12: temperature-scaled cosine cross-entropy. Logits = cosine similarity
+            # between L2-normalized prediction and L2-normalized vocab, scaled by
+            # INV_TEMPERATURE so softmax is sharp enough to commit (CLIP-style).
+            predicted_norm = F.normalize(predicted, dim=-1)
+            target_global_idx = torch.tensor(
+                [word_to_global_idx[w] for w in target_words], dtype=torch.long
+            ).to(DEVICE)
+            logits = (predicted_norm @ vocab_matrix_normed.T) * INV_TEMPERATURE  # (B, V)
+            ce_loss = F.cross_entropy(logits, target_global_idx)
 
             ponder_cost = 0.05 * ponder_steps  # encourage halt gate to stop early for easy tokens
 
-            # Coherence penalty: ngram_memory and predicted should agree in direction.
-            # cos_sim in [-1, 1]; penalty = 1 - sim, so opposing vectors get penalized ~2,
-            # aligned vectors get ~0. Weight 0.05 keeps it subordinate to mse_loss.
-            cos_sim = F.cosine_similarity(predicted, ngram_memory, dim=-1).mean()
-            coherence_penalty = 0.05 * (1.0 - cos_sim)
+            # Coherence penalty (v6-v11) was a hack to align MSE prediction with n-gram
+            # direction. Cross-entropy already forces commitment to a specific token,
+            # so the penalty is redundant and dropped in v12.
 
-            loss = mse_loss + ponder_cost + coherence_penalty
+            loss = ce_loss + ponder_cost
 
             loss.backward()
 
