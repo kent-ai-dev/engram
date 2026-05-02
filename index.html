@@ -121,57 +121,70 @@ a:hover{text-decoration:underline}
   <div class="header">
     <div>
       <div class="logo">engram</div>
-      <div class="subtitle">v10_dialog_corpus · Status Report</div>
+      <div class="subtitle">v11_dialog_2corpus · Status Report</div>
     </div>
     <div class="header-right">
       <a class="chat-link" href="http://108.181.97.223:5000" target="_blank">
         Try Engram →
       </a>
-      <span class="updated">Updated: 2026-04-30 00:00 UTC</span>
+      <span class="updated">Updated: 2026-05-02 04:00 UTC</span>
     </div>
   </div>
 
   <!-- Honest status banner -->
   <div class="card" style="margin-bottom:24px;border:1px solid var(--yellow)">
-    <div class="card-title" style="color:var(--yellow)">Status — v10 Is Effectively a v9 Re-Run. The Corpus Expansion Hypothesis Was Not Tested.</div>
+    <div class="card-title" style="color:var(--yellow)">Status — v11: First Clean Test of Corpus-Expansion Hypothesis. Still Word Salad. Corpus Volume Is Not the Bottleneck.</div>
     <p style="font-size:0.9rem;line-height:1.6">
-      Update 2026-04-30: <strong>v10_dialog_corpus deployed live</strong> — 384D / 12L / 12H / RoPE / Pre-LN / AdamW,
-      vocab=9,509, brain_params=21,509,761. Trained 2026-04-29 08:52 UTC on Modal L4, ~$4.
+      Update 2026-05-02: <strong>v11_dialog_2corpus deployed live</strong> — architecture frozen at v9/v10's 384D / 12L / 12H / RoPE / Pre-LN / AdamW,
+      brain_params=21,509,761. Trained 2026-05-02 03:55 UTC on Modal L4, 11h08m wall-time, ~$6.
+      <strong>Vocab grew 9,509 → 14,704</strong> — definitive proof both corpus files were ingested this time (v10's vocab stayed at 9,509 because
+      the second file got dropped due to a commit bug). The corpus-expansion hypothesis was actually tested for the first time.
     </p>
     <p style="font-size:0.9rem;line-height:1.6;margin-top:8px">
-      <strong>The bug that invalidated v10 as an experiment:</strong>
-      v10 was launched on Modal with <span class="mono">BOOKS=["corpus/dailydialog_clean.txt", "corpus/everyday_conversations.txt"]</span>,
-      but <span class="mono">corpus/everyday_conversations.txt</span> was not committed to GitHub at the time of launch.
-      Modal training clones the repo from GitHub — the file was not in the container.
-      <span class="mono">ingest.py</span> line 134 silently filters missing paths:
-      <span class="mono">corpus_files = [b for b in args.books if os.path.exists(b)]</span>.
-      Result: v10 trained on <span class="mono">dailydialog_clean.txt</span> only — the exact same corpus as v9.
-      Confirmed by vocab_size=9,509 — bit-identical to v9. A real corpus expansion would have changed it.
-      <strong>v10 is effectively a v9 re-run with a different random seed. $4 of Modal time was wasted.</strong>
+      <strong>What was different from v10:</strong> the subprocess timeout was bumped from 27,800s → 42,000s (the v11-original failure mode),
+      function timeout from 28,800s → 43,200s, and per-epoch checkpointing was added to <span class="mono">ingest.py</span> as defense-in-depth.
+      Both <span class="mono">dailydialog_clean.txt</span> and <span class="mono">everyday_conversations.txt</span> (5.3 MB combined) were committed and
+      present in the container. Engram N-gram module size doubled (74.4 MB → 147.6 MB) because <span class="mono">NGRAM_TABLE_SIZE</span> was also bumped
+      from 50,021 → 100,003.
     </p>
     <p style="font-size:0.9rem;line-height:1.6;margin-top:8px">
-      <strong>Eval results (eval_chat.py, 16 prompts — eval_runs/chat_20260429_200824.json):</strong>
+      <strong>Loss progression (5 epochs):</strong>
+      epoch 1: 1.1084 · epoch 2: 1.0867 · epoch 3: 1.0749 · epoch 4: ~1.057 · epoch 5 (final): <strong>1.0480</strong>.
+      Compared to v9/v10 finals around 1.05, v11 lands close — but with 55% more vocab to discriminate.
+      Comparable per-token loss on a harder distribution is consistent with genuine improvement from the expanded corpus.
+    </p>
+    <p style="font-size:0.9rem;line-height:1.6;margin-top:8px">
+      <strong>Eval results (eval_chat.py, 16 prompts — eval_runs/chat_20260502_195749.json):</strong>
       Criterion 1 (distinct outputs) — <strong style="color:var(--green)">PASS</strong>, 16/16 distinct.
-      Criterion 2 (≥80% real-English tokens) — <strong style="color:var(--yellow)">mostly pass</strong>, real English words
-      but with odd tokens like <span class="mono">kramer, wisconsin, interpersonal</span>.
-      Criterion 3 (≥3/5 chitchat replies coherent) — <strong style="color:var(--red)">FAIL</strong>, still word salad.
-      Fragments are marginally more grammatical than v9 ("you re a", "i don t", "i ve have", "i m a") but no coherent sentences.
+      Criterion 2 (real English tokens) — <strong style="color:var(--yellow)">partial pass</strong>: cleaner grammar fragments emerged,
+      but the everyday-conversations corpus introduced brand and proper-noun leakage:
+      <span class="mono">ursa, stevia, breville, peppercorns, polaroid, gluteus, vpn, photoshop, ronaldo, infielders</span>.
+      Criterion 3 (≥3/5 chitchat replies coherent) — <strong style="color:var(--red)">FAIL</strong>: same word-salad as v9/v10.
+      Fragments like "bot i think", "i can", "i ve period", "you can t a", "i m you" — no coherent sentences.
     </p>
     <p style="font-size:0.9rem;line-height:1.6;margin-top:8px">
       Sample replies from eval transcript
-      (<span class="mono small">eval_runs/chat_20260429_200824.json</span>):
-      <br><span class="mono small">USER: "what do you like to do" → BOT: "user i have candles possess of the bot situations we have the candles for a"</span>
-      <br><span class="mono small">USER: "tell me about yourself" → BOT: "user oh seem that is hospitable i sticker possess managers bot it basil be i"</span>
-      <br><span class="mono small">USER: "do you have any friends" → BOT: "i shuttle that of unk i m do in my i can advertise bot it"</span>
+      (<span class="mono small">eval_runs/chat_20260502_195749.json</span>):
+      <br><span class="mono small">USER: "what do you like to do" → BOT: "bot i think stimulation spaceship the i can photoshop deformity the bot stimulation for a"</span>
+      <br><span class="mono small">USER: "tell me about yourself" → BOT: "bot bald is i think the a unknown that carmichael i can photoshop bombs the"</span>
+      <br><span class="mono small">USER: "do you have any friends" → BOT: "bot i don resolved the it s my unknown of the you foodborne it user"</span>
     </p>
     <p style="font-size:0.9rem;line-height:1.6;margin-top:8px">
-      <strong>Lesson logged in <span class="mono">plans/V11_PLAN.md</span> pre-flight checklist:</strong>
-      "BOOKS files must be in HEAD before launch; verify with <span class="mono">git ls-tree HEAD corpus/</span>."
-      Next concrete step is a <strong>v10-redo</strong> — commit <span class="mono">everyday_conversations.txt</span>
-      first, then re-run with both corpora actually present. That will finally test the original corpus-expansion hypothesis.
-      v11 corpus expansion (smol-smoltalk, MultivexAI) is on hold — smol-smoltalk proved to be instruction-tuning data
-      (system prompts, code generation) rather than conversational; MultivexAI was only 30 KB of single-sentence utterances.
-      Neither is suitable. v11 corpus selection is TBD pending the v10-redo result.
+      <strong>Notable signal — avg_ponder collapsed to 1.0:</strong>
+      every prior model showed <span class="mono">avg_ponder=3.0</span> (max), meaning the halt gate always ran the full pondering loop.
+      v11 shows <span class="mono">avg_ponder=1.0</span> — the halt gate now terminates after 1 step confidently.
+      The bigger vocab gives sharper predictions; the model "knows" earlier when it has its answer.
+      Interesting structural change, but it did not translate to coherence.
+    </p>
+    <p style="font-size:0.9rem;line-height:1.6;margin-top:8px">
+      <strong>The corpus-volume hypothesis is refuted.</strong>
+      v9 (capacity increase, same corpus) produced word salad. v11 (same arch, +55% vocab) is at the same coherence level.
+      Two of the three obvious levers — model capacity and corpus volume — have now been tested cleanly and neither fixes coherence.
+      <strong>The remaining hypothesis (driving v12):</strong> the loss function is the root cause.
+      Engram trains with MSE on continuous concept embeddings, predicting the <em>embedding</em> of the next token as a regression.
+      MSE rewards predicting the <em>average</em> of plausible next-tokens, which for grammar produces blurry word salad — exactly what we observe.
+      Standard LMs use cross-entropy on token logits (classification), which forces commitment to a specific token.
+      v12 will test switching to softmax cross-entropy over the existing concept-vocab embeddings.
     </p>
   </div>
 
@@ -182,15 +195,15 @@ a:hover{text-decoration:underline}
     <div class="card">
       <div class="card-title">Active Deployment</div>
       <div class="score-gauge">
-        <div><span class="score-big" style="font-size:2.1rem;color:var(--cyan)">v10_dialog_corpus</span></div>
-        <div><span class="status-badge" style="background:var(--yellow);color:#000">LIVE · WORD SALAD (v9 re-run)</span></div>
-        <div class="score-ts">Trained 2026-04-29 08:52 UTC · Modal L4 GPU · ~$4</div>
+        <div><span class="score-big" style="font-size:2.1rem;color:var(--cyan)">v11_dialog_2corpus</span></div>
+        <div><span class="status-badge" style="background:var(--yellow);color:#000">LIVE · WORD SALAD (corpus expansion refuted)</span></div>
+        <div class="score-ts">Trained 2026-05-02 03:55 UTC · Modal L4 GPU · 11h08m · ~$6</div>
         <div class="failure-tags" style="justify-content:center;margin-top:10px">
           <span class=tag style="border-color:var(--green);color:var(--green)">Pre-LN</span>
           <span class=tag style="border-color:var(--green);color:var(--green)">AdamW</span>
           <span class=tag style="border-color:var(--green);color:var(--green)">RoPE</span>
           <span class=tag style="border-color:var(--green);color:var(--green)">21.5M params</span>
-          <span class=tag style="border-color:var(--red);color:var(--red)">corpus bug</span>
+          <span class=tag style="border-color:var(--green);color:var(--green)">vocab 14,704</span>
           <span class=tag style="border-color:var(--yellow);color:var(--yellow)">no syntax yet</span>
         </div>
       </div>
@@ -198,7 +211,7 @@ a:hover{text-decoration:underline}
 
     <!-- Training metrics -->
     <div class="card">
-      <div class="card-title">v10 Training Metrics</div>
+      <div class="card-title">v11 Training Metrics</div>
       <div class="sub-score-row">
         <span class="sub-label muted">distinct</span>
         <div class="bar-track"><div class="bar-fill" style="width:100%;background:var(--green)"></div></div>
@@ -206,8 +219,8 @@ a:hover{text-decoration:underline}
       </div>
       <div class="sub-score-row">
         <span class="sub-label muted">english</span>
-        <div class="bar-track"><div class="bar-fill" style="width:75%;background:var(--yellow)"></div></div>
-        <span class="sub-val mono" style="color:var(--yellow)">mostly</span>
+        <div class="bar-track"><div class="bar-fill" style="width:60%;background:var(--yellow)"></div></div>
+        <span class="sub-val mono" style="color:var(--yellow)">partial</span>
       </div>
       <div class="sub-score-row">
         <span class="sub-label muted">coherent</span>
@@ -232,7 +245,7 @@ a:hover{text-decoration:underline}
     </div>
     <div class="info-row">
       <span class="info-key">Active model</span>
-      <span class="info-val mono" style="color:var(--cyan)">v10_dialog_corpus</span>
+      <span class="info-val mono" style="color:var(--cyan)">v11_dialog_2corpus</span>
     </div>
     <div class="info-row">
       <span class="info-key">Architecture</span>
@@ -243,20 +256,24 @@ a:hover{text-decoration:underline}
       <span class="info-val mono">21,509,761</span>
     </div>
     <div class="info-row">
+      <span class="info-key">Engram module params</span>
+      <span class="info-val mono">38,696,064 (N-gram table doubled: 50,021 → 100,003)</span>
+    </div>
+    <div class="info-row">
       <span class="info-key">Vocab size</span>
-      <span class="info-val mono">9,509 (cleaned dailydialog — corpus bug, see notes)</span>
+      <span class="info-val mono">14,704 (was 9,509 — confirmed both corpora ingested)</span>
     </div>
     <div class="info-row">
       <span class="info-key">Corpus</span>
-      <span class="info-val mono" style="color:var(--yellow)">dailydialog_clean.txt only — corpus bug, see notes</span>
+      <span class="info-val mono">dailydialog_clean.txt + everyday_conversations.txt (5.3 MB combined)</span>
     </div>
     <div class="info-row">
       <span class="info-key">Training</span>
-      <span class="info-val mono">5 epochs · Modal L4 · ~$4 · 2026-04-29T08:52:00Z</span>
+      <span class="info-val mono">5 epochs · Modal L4 · 11h08m · 2026-05-02T03:55:00Z</span>
     </div>
     <div class="info-row">
       <span class="info-key">Training cost</span>
-      <span class="info-val mono">$4.00 (wasted — effectively v9 re-run)</span>
+      <span class="info-val mono">$6.00</span>
     </div>
     <div class="info-row">
       <span class="info-key">Platform</span>
@@ -327,6 +344,68 @@ a:hover{text-decoration:underline}
           <td>Lock + document</td>
           <td><span class="badge" style="color:var(--green);border-color:var(--green)">PASSED</span></td>
           <td class="muted small">use_rope=True locked as default; README updated</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- What we've learned -->
+  <div class="card" style="margin-bottom:24px">
+    <div class="card-title">What We've Learned — v8 through v11</div>
+    <p style="font-size:0.85rem;color:var(--muted);margin-bottom:12px">
+      Each run tested one hypothesis. Architecture has been stable since v6 (Pre-LN + AdamW + RoPE).
+    </p>
+    <table class="runs-table">
+      <thead>
+        <tr>
+          <th>Model</th>
+          <th>Change tested</th>
+          <th>Final loss</th>
+          <th>Vocab</th>
+          <th>Coherent?</th>
+          <th>Conclusion</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="mono">v8_clean</td>
+          <td class="small">Corpus cleanup — strip numeric artifacts, merge rare tokens</td>
+          <td class="mono">1.0044</td>
+          <td class="mono">9,509</td>
+          <td><span class="badge" style="color:var(--yellow);border-color:var(--yellow)">Real words, no grammar</span></td>
+          <td class="muted small">Cleanup worked — output became recognizable English. Grammar still missing.</td>
+        </tr>
+        <tr>
+          <td class="mono">v9_dialog_big</td>
+          <td class="small">Capacity — 384D / 12L / 12H, ~21.5M brain params (was ~6M)</td>
+          <td class="mono">~1.05</td>
+          <td class="mono">9,509</td>
+          <td><span class="badge" style="color:var(--red);border-color:var(--red)">FAIL</span></td>
+          <td class="muted small">Model capacity hypothesis refuted. Word salad at 21.5M same as at 6M.</td>
+        </tr>
+        <tr>
+          <td class="mono">v10_dialog_corpus</td>
+          <td class="small">Corpus expansion — intended to add everyday_conversations.txt</td>
+          <td class="mono">~1.05</td>
+          <td class="mono">9,509</td>
+          <td><span class="badge" style="color:var(--muted);border-color:var(--muted)">NOT TESTED</span></td>
+          <td class="muted small">File not committed. Corpus expansion hypothesis was not tested — v9 re-run.</td>
+        </tr>
+        <tr>
+          <td class="mono">v11_dialog_2corpus</td>
+          <td class="small">Corpus expansion — first clean test with both files committed</td>
+          <td class="mono">1.0480</td>
+          <td class="mono">14,704</td>
+          <td><span class="badge" style="color:var(--red);border-color:var(--red)">FAIL</span></td>
+          <td class="muted small">Corpus volume hypothesis refuted. +55% vocab, same coherence level as v9.</td>
+        </tr>
+        <tr>
+          <td class="mono" style="color:var(--purple)">v12 (planned)</td>
+          <td class="small">Loss function — MSE on embeddings → softmax cross-entropy on logits</td>
+          <td class="mono muted">TBD</td>
+          <td class="mono muted">TBD</td>
+          <td><span class="badge" style="color:var(--purple);border-color:var(--purple)">PLANNED</span></td>
+          <td class="muted small">MSE rewards mean-token prediction → word salad. Cross-entropy forces a specific token.</td>
         </tr>
       </tbody>
     </table>
@@ -425,36 +504,28 @@ a:hover{text-decoration:underline}
 
   <!-- Logical next steps -->
   <div class="card" style="margin-bottom:24px">
-    <div class="card-title">Logical Next Steps (updated 2026-04-30)</div>
+    <div class="card-title">Logical Next Steps (updated 2026-05-02)</div>
     <ol style="font-size:0.9rem;line-height:1.8;padding-left:24px">
       <li>
-        <strong>v10-redo — run the experiment v10 was supposed to be.</strong>
-        The <span class="mono">everyday_conversations.txt</span> file is now committed to the repo.
-        Before any other change, re-run training with both
-        <span class="mono">dailydialog_clean.txt</span> and
-        <span class="mono">everyday_conversations.txt</span> actually present.
-        Pre-flight check: run <span class="mono">git ls-tree HEAD corpus/</span> and confirm both files appear
-        before launching Modal. Expected signal: if vocab_size changes from 9,509, the expanded corpus was ingested.
-        Same 21.5M-param architecture, same cost (~$4 on L4).
+        <strong>v12 — test the loss-function hypothesis.</strong>
+        Architecture and corpus are exhausted as levers. v9 (capacity increase) and v11 (corpus expansion, cleanly tested)
+        both fail at the same coherence level. The root-cause hypothesis for v12:
+        <strong>MSE on embeddings rewards predicting the mean of plausible tokens</strong>, which for grammar produces blurry word salad.
+        Standard LMs use cross-entropy on token logits (classification), which forces commitment to a specific token.
+        v12 will switch to softmax cross-entropy over the existing concept-vocab embeddings —
+        no architecture change, no corpus change, just the loss function.
+        This is the cheapest informative experiment remaining.
       </li>
       <li>
-        <strong>Evaluate corpus size effect after the redo.</strong>
-        Compare v10-redo eval against v9/v10. If coherence improves with the second corpus,
-        data variety is confirmed as the bottleneck and the path forward is adding more open-license
-        dialog corpora (Persona-Chat, OpenAssistant subsets, WildChat).
-        If the redo still fails, revisit training duration (more epochs) before adding more data.
+        <strong>Confirm the avg_ponder collapse in v12.</strong>
+        v11 showed <span class="mono">avg_ponder=1.0</span> where all prior models showed <span class="mono">3.0</span>.
+        This may be a side-effect of the bigger vocab giving sharper softmax distributions, or it may indicate
+        the halt gate converged on a degenerate policy. Monitor in v12 to distinguish.
       </li>
       <li>
-        <strong>v11 corpus selection is on hold.</strong>
-        smol-smoltalk was rejected — it is instruction-tuning data (system prompts, code generation,
-        meta-formatting), not conversational dialog. MultivexAI is only 30 KB of single-sentence
-        utterances — too small to help. No suitable v11 corpus has been identified yet.
-        TBD after the v10-redo result is in hand.
-      </li>
-      <li>
-        <strong>Only scale model further if data is addressed first.</strong>
-        Going wider/deeper without a confirmed working corpus expansion would repeat the v9 mistake.
-        Target: 50M+ params only once a training run demonstrates improved coherence from a larger corpus.
+        <strong>Do not add more corpus until the loss-function fix is validated.</strong>
+        Larger or more varied corpora will not help while MSE is pushing the model toward the mean.
+        The word-salad pattern is consistent with the loss function, not a data problem.
       </li>
     </ol>
   </div>
@@ -474,15 +545,21 @@ a:hover{text-decoration:underline}
       <tbody>
         <tr>
           <td class="mono muted">TBD</td>
-          <td class="mono" style="color:var(--purple)">v10-redo / v11</td>
-          <td><span class="badge" style="color:var(--purple);border-color:var(--purple)">PENDING · CORPUS TBD</span></td>
-          <td class="muted small">v10-redo: commit everyday_conversations.txt then re-run to actually test corpus expansion; v11 corpus selection on hold (smol-smoltalk and MultivexAI both unsuitable)</td>
+          <td class="mono" style="color:var(--purple)">v12</td>
+          <td><span class="badge" style="color:var(--purple);border-color:var(--purple)">PLANNED · LOSS-FUNCTION DIAGNOSTIC</span></td>
+          <td class="muted small">switch MSE on embeddings → softmax cross-entropy on concept-vocab logits; architecture and corpus unchanged; tests whether loss function is root cause of word salad</td>
+        </tr>
+        <tr>
+          <td class="mono muted">2026-05-02 03:55</td>
+          <td class="mono" style="color:var(--cyan)">v11_dialog_2corpus</td>
+          <td><span class="badge" style="color:var(--yellow);border-color:var(--yellow)">LIVE · WORD SALAD (corpus expansion refuted)</span></td>
+          <td class="muted small">vocab grew 9,509 → 14,704 confirming both corpora ingested; final loss 1.0480 on 55% larger vocab; eval 1/3 — distinct PASS, english partial (proper-noun leakage), coherent FAIL; avg_ponder collapsed 3.0→1.0; 11h08m · ~$6</td>
         </tr>
         <tr>
           <td class="mono muted">2026-04-29 08:52</td>
-          <td class="mono" style="color:var(--cyan)">v10_dialog_corpus</td>
-          <td><span class="badge" style="color:var(--yellow);border-color:var(--yellow)">LIVE · WORD SALAD (v9 re-run)</span></td>
-          <td class="muted small">corpus bug: everyday_conversations.txt not committed — trained on dailydialog only (same as v9); vocab=9,509 confirms no expansion; 21,509,761 params · ~$4 wasted</td>
+          <td class="mono">v10_dialog_corpus</td>
+          <td><span class="badge" style="color:var(--muted);border-color:var(--muted)">REPLACED</span></td>
+          <td class="muted small">corpus bug: everyday_conversations.txt not committed — trained on dailydialog only (same as v9); vocab=9,509 confirms no expansion; effectively a v9 re-run · ~$4 wasted</td>
         </tr>
         <tr>
           <td class="mono muted">2026-04-28 19:50</td>
@@ -545,7 +622,7 @@ a:hover{text-decoration:underline}
   <!-- Footer -->
   <div class="footer">
     <p>engram is an experimental neural language model with adaptive pondering, N-gram memory, and continuous-concept vocabulary. <a href="https://github.com/kent-ai-dev/engram" target="_blank">GitHub</a></p>
-    <p style="margin-top:4px">Status report updated 2026-04-30.</p>
+    <p style="margin-top:4px">Status report updated 2026-05-02.</p>
   </div>
 
 </div>
