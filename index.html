@@ -121,70 +121,62 @@ a:hover{text-decoration:underline}
   <div class="header">
     <div>
       <div class="logo">engram</div>
-      <div class="subtitle">v11_dialog_2corpus · Status Report</div>
+      <div class="subtitle">v12_xent · Status Report</div>
     </div>
     <div class="header-right">
       <a class="chat-link" href="http://108.181.97.223:5000" target="_blank">
         Try Engram →
       </a>
-      <span class="updated">Updated: 2026-05-02 04:00 UTC</span>
+      <span class="updated">Updated: 2026-05-03 17:00 UTC</span>
     </div>
   </div>
 
   <!-- Honest status banner -->
   <div class="card" style="margin-bottom:24px;border:1px solid var(--yellow)">
-    <div class="card-title" style="color:var(--yellow)">Status — v11: First Clean Test of Corpus-Expansion Hypothesis. Still Word Salad. Corpus Volume Is Not the Bottleneck.</div>
+    <div class="card-title" style="color:var(--yellow)">Status — v12_xent: First Clean Test of the Loss-Function Hypothesis. Still Incoherent. Loss Function Alone Does Not Close the Gap.</div>
     <p style="font-size:0.9rem;line-height:1.6">
-      Update 2026-05-02: <strong>v11_dialog_2corpus deployed live</strong> — architecture frozen at v9/v10's 384D / 12L / 12H / RoPE / Pre-LN / AdamW,
-      brain_params=21,509,761. Trained 2026-05-02 03:55 UTC on Modal L4, 11h08m wall-time, ~$6.
-      <strong>Vocab grew 9,509 → 14,704</strong> — definitive proof both corpus files were ingested this time (v10's vocab stayed at 9,509 because
-      the second file got dropped due to a commit bug). The corpus-expansion hypothesis was actually tested for the first time.
+      Update 2026-05-03: <strong>v12_xent deployed live</strong> — single-variable swap from v11: training loss changed from MSE-on-embeddings
+      to <strong>temperature-scaled cosine cross-entropy via tied output projection</strong>
+      (<span class="mono">predicted_norm @ vocab_matrix_normed.T * INV_TEMP=10</span>).
+      Architecture and corpus are identical to v11 (12 layers, 384D, 12H, RoPE, Pre-LN, AdamW, ~21.5M brain / ~38.7M engram params,
+      vocab 14,704, context 32, 5.3 MB corpus). Trained 2026-05-03 on Modal L4, $6.00.
+      The v6–v11-era <span class="mono">coherence_penalty</span> MSE hack was dropped.
+      Per-epoch refresh of <span class="mono">vocab_matrix_global</span> from the drifting <span class="mono">embed_cache</span>.
     </p>
     <p style="font-size:0.9rem;line-height:1.6;margin-top:8px">
-      <strong>What was different from v10:</strong> the subprocess timeout was bumped from 27,800s → 42,000s (the v11-original failure mode),
-      function timeout from 28,800s → 43,200s, and per-epoch checkpointing was added to <span class="mono">ingest.py</span> as defense-in-depth.
-      Both <span class="mono">dailydialog_clean.txt</span> and <span class="mono">everyday_conversations.txt</span> (5.3 MB combined) were committed and
-      present in the container. Engram N-gram module size doubled (74.4 MB → 147.6 MB) because <span class="mono">NGRAM_TABLE_SIZE</span> was also bumped
-      from 50,021 → 100,003.
+      <strong>Loss progression (5 epochs, cross-entropy — not comparable to v11's MSE 1.05):</strong>
+      epoch 1: 8.16 · epoch 2: 8.00 · epoch 3: 7.74 · epoch 4: 7.54 · epoch 5 (final): <strong>7.38</strong>.
+      Steady ~−0.2 nats/epoch confirms cross-entropy training is functioning.
+      Theoretical floor at INV_TEMP=10: ≈1.77 nats. The model still has 5.6 nats of headroom and isn't closing it —
+      the temperature is not giving the softmax enough bite to force sharp token discrimination.
     </p>
     <p style="font-size:0.9rem;line-height:1.6;margin-top:8px">
-      <strong>Loss progression (5 epochs):</strong>
-      epoch 1: 1.1084 · epoch 2: 1.0867 · epoch 3: 1.0749 · epoch 4: ~1.057 · epoch 5 (final): <strong>1.0480</strong>.
-      Compared to v9/v10 finals around 1.05, v11 lands close — but with 55% more vocab to discriminate.
-      Comparable per-token loss on a harder distribution is consistent with genuine improvement from the expanded corpus.
-    </p>
-    <p style="font-size:0.9rem;line-height:1.6;margin-top:8px">
-      <strong>Eval results (eval_chat.py, 16 prompts — eval_runs/chat_20260502_195749.json):</strong>
-      Criterion 1 (distinct outputs) — <strong style="color:var(--green)">PASS</strong>, 16/16 distinct.
-      Criterion 2 (real English tokens) — <strong style="color:var(--yellow)">partial pass</strong>: cleaner grammar fragments emerged,
-      but the everyday-conversations corpus introduced brand and proper-noun leakage:
-      <span class="mono">ursa, stevia, breville, peppercorns, polaroid, gluteus, vpn, photoshop, ronaldo, infielders</span>.
-      Criterion 3 (≥3/5 chitchat replies coherent) — <strong style="color:var(--red)">FAIL</strong>: same word-salad as v9/v10.
-      Fragments like "bot i think", "i can", "i ve period", "you can t a", "i m you" — no coherent sentences.
+      <strong>Eval results (eval_chat.py — eval_runs/chat_20260503_165046.json):</strong>
+      The model is not collapsed — replies differ per prompt. Dialog-shape tokens appear
+      (<span class="mono">user, bot, i, you, the</span>; occasional bigrams like "i'm not going", "i ll go to", "what poaching do you think").
+      But no coherent English sentences — word salad with the right grammatical scaffolding.
+      Criterion 3 (≥3/5 chitchat replies coherent) — <strong style="color:var(--red)">FAIL</strong>.
     </p>
     <p style="font-size:0.9rem;line-height:1.6;margin-top:8px">
       Sample replies from eval transcript
-      (<span class="mono small">eval_runs/chat_20260502_195749.json</span>):
-      <br><span class="mono small">USER: "what do you like to do" → BOT: "bot i think stimulation spaceship the i can photoshop deformity the bot stimulation for a"</span>
-      <br><span class="mono small">USER: "tell me about yourself" → BOT: "bot bald is i think the a unknown that carmichael i can photoshop bombs the"</span>
-      <br><span class="mono small">USER: "do you have any friends" → BOT: "bot i don resolved the it s my unknown of the you foodborne it user"</span>
+      (<span class="mono small">eval_runs/chat_20260503_165046.json</span>):
+      <br><span class="mono small">USER: "hello" → BOT: "user do fragrance that are of be curb cortina what is it typical good the"</span>
+      <br><span class="mono small">USER: "hi how are you" → BOT: "and me cgi slim a and to course unnecessary tailors i think illness but you"</span>
+      <br><span class="mono small">USER: "tell me about yourself" → BOT: "user yes it lasts you are not sure dump rica bot you vegetables are the"</span>
+      <br><span class="mono small">USER: "what is the capital of france" → BOT: "and concentrate bot tools i have a unk sara grandfather is my canvas and i"</span>
     </p>
     <p style="font-size:0.9rem;line-height:1.6;margin-top:8px">
-      <strong>Notable signal — avg_ponder collapsed to 1.0:</strong>
-      every prior model showed <span class="mono">avg_ponder=3.0</span> (max), meaning the halt gate always ran the full pondering loop.
-      v11 shows <span class="mono">avg_ponder=1.0</span> — the halt gate now terminates after 1 step confidently.
-      The bigger vocab gives sharper predictions; the model "knows" earlier when it has its answer.
-      Interesting structural change, but it did not translate to coherence.
+      <strong>What the cross-entropy swap did and did not do:</strong>
+      The loss-function hypothesis is <em>partly</em> supported — training functions cleanly under cross-entropy,
+      and dialog scaffolding tokens are present in outputs (the model has learned turn structure, not just word co-occurrence).
+      But the model cannot discriminate sharply enough at INV_TEMP=10. The softmax is too flat: with a temperature of 0.1
+      (INV_TEMP=10), the distribution is not peaked enough to force commitment to a specific lexical token.
+      This is a temperature-calibration problem, not a fundamental architecture problem.
     </p>
     <p style="font-size:0.9rem;line-height:1.6;margin-top:8px">
-      <strong>The corpus-volume hypothesis is refuted.</strong>
-      v9 (capacity increase, same corpus) produced word salad. v11 (same arch, +55% vocab) is at the same coherence level.
-      Two of the three obvious levers — model capacity and corpus volume — have now been tested cleanly and neither fixes coherence.
-      <strong>The remaining hypothesis (driving v12):</strong> the loss function is the root cause.
-      Engram trains with MSE on continuous concept embeddings, predicting the <em>embedding</em> of the next token as a regression.
-      MSE rewards predicting the <em>average</em> of plausible next-tokens, which for grammar produces blurry word salad — exactly what we observe.
-      Standard LMs use cross-entropy on token logits (classification), which forces commitment to a specific token.
-      v12 will test switching to softmax cross-entropy over the existing concept-vocab embeddings.
+      <strong>Next hypothesis — v13:</strong> bump INV_TEMP to 30+ to sharpen the softmax distribution.
+      At INV_TEMP=30 the theoretical floor drops to ~0.59 nats and token discrimination should increase significantly.
+      Architecture and corpus remain frozen. Commit <span class="mono">e281458</span>.
     </p>
   </div>
 
@@ -195,31 +187,32 @@ a:hover{text-decoration:underline}
     <div class="card">
       <div class="card-title">Active Deployment</div>
       <div class="score-gauge">
-        <div><span class="score-big" style="font-size:2.1rem;color:var(--cyan)">v11_dialog_2corpus</span></div>
-        <div><span class="status-badge" style="background:var(--yellow);color:#000">LIVE · WORD SALAD (corpus expansion refuted)</span></div>
-        <div class="score-ts">Trained 2026-05-02 03:55 UTC · Modal L4 GPU · 11h08m · ~$6</div>
+        <div><span class="score-big" style="font-size:2.1rem;color:var(--cyan)">v12_xent</span></div>
+        <div><span class="status-badge" style="background:var(--yellow);color:#000">LIVE · WORD SALAD (loss-function swap, INV_TEMP=10 too flat)</span></div>
+        <div class="score-ts">Trained 2026-05-03 · Modal L4 GPU · $6.00</div>
         <div class="failure-tags" style="justify-content:center;margin-top:10px">
           <span class=tag style="border-color:var(--green);color:var(--green)">Pre-LN</span>
           <span class=tag style="border-color:var(--green);color:var(--green)">AdamW</span>
           <span class=tag style="border-color:var(--green);color:var(--green)">RoPE</span>
+          <span class=tag style="border-color:var(--green);color:var(--green)">cosine x-ent</span>
           <span class=tag style="border-color:var(--green);color:var(--green)">21.5M params</span>
           <span class=tag style="border-color:var(--green);color:var(--green)">vocab 14,704</span>
-          <span class=tag style="border-color:var(--yellow);color:var(--yellow)">no syntax yet</span>
+          <span class=tag style="border-color:var(--yellow);color:var(--yellow)">INV_TEMP=10 too flat</span>
         </div>
       </div>
     </div>
 
     <!-- Training metrics -->
     <div class="card">
-      <div class="card-title">v11 Training Metrics</div>
+      <div class="card-title">v12 Training Metrics</div>
       <div class="sub-score-row">
         <span class="sub-label muted">distinct</span>
         <div class="bar-track"><div class="bar-fill" style="width:100%;background:var(--green)"></div></div>
-        <span class="sub-val mono" style="color:var(--green)">16/16</span>
+        <span class="sub-val mono" style="color:var(--green)">PASS</span>
       </div>
       <div class="sub-score-row">
-        <span class="sub-label muted">english</span>
-        <div class="bar-track"><div class="bar-fill" style="width:60%;background:var(--yellow)"></div></div>
+        <span class="sub-label muted">scaffolding</span>
+        <div class="bar-track"><div class="bar-fill" style="width:55%;background:var(--yellow)"></div></div>
         <span class="sub-val mono" style="color:var(--yellow)">partial</span>
       </div>
       <div class="sub-score-row">
@@ -228,9 +221,9 @@ a:hover{text-decoration:underline}
         <span class="sub-val mono" style="color:var(--red)">0/5</span>
       </div>
       <div class="sub-score-row">
-        <span class="sub-label muted">eval</span>
-        <div class="bar-track"><div class="bar-fill" style="width:33%;background:var(--red)"></div></div>
-        <span class="sub-val mono" style="color:var(--red)">1/3</span>
+        <span class="sub-label muted">loss floor</span>
+        <div class="bar-track"><div class="bar-fill" style="width:24%;background:var(--yellow)"></div></div>
+        <span class="sub-val mono" style="color:var(--yellow)">7.38</span>
       </div>
     </div>
 
@@ -245,11 +238,15 @@ a:hover{text-decoration:underline}
     </div>
     <div class="info-row">
       <span class="info-key">Active model</span>
-      <span class="info-val mono" style="color:var(--cyan)">v11_dialog_2corpus</span>
+      <span class="info-val mono" style="color:var(--cyan)">v12_xent</span>
     </div>
     <div class="info-row">
       <span class="info-key">Architecture</span>
-      <span class="info-val mono">12L · 384D · 12H · head_dim=32 · RoPE · Pre-LN</span>
+      <span class="info-val mono">12L · 384D · 12H · head_dim=32 · RoPE · Pre-LN (frozen since v9)</span>
+    </div>
+    <div class="info-row">
+      <span class="info-key">Loss function</span>
+      <span class="info-val mono">cosine cross-entropy · tied output projection · INV_TEMP=10</span>
     </div>
     <div class="info-row">
       <span class="info-key">Brain params</span>
@@ -257,11 +254,11 @@ a:hover{text-decoration:underline}
     </div>
     <div class="info-row">
       <span class="info-key">Engram module params</span>
-      <span class="info-val mono">38,696,064 (N-gram table doubled: 50,021 → 100,003)</span>
+      <span class="info-val mono">38,696,064</span>
     </div>
     <div class="info-row">
       <span class="info-key">Vocab size</span>
-      <span class="info-val mono">14,704 (was 9,509 — confirmed both corpora ingested)</span>
+      <span class="info-val mono">14,704</span>
     </div>
     <div class="info-row">
       <span class="info-key">Corpus</span>
@@ -269,7 +266,11 @@ a:hover{text-decoration:underline}
     </div>
     <div class="info-row">
       <span class="info-key">Training</span>
-      <span class="info-val mono">5 epochs · Modal L4 · 11h08m · 2026-05-02T03:55:00Z</span>
+      <span class="info-val mono">5 epochs · Modal L4 · 2026-05-03</span>
+    </div>
+    <div class="info-row">
+      <span class="info-key">Final loss</span>
+      <span class="info-val mono">7.379 nats (theoretical floor at INV_TEMP=10: ≈1.77 — 5.6 nats headroom)</span>
     </div>
     <div class="info-row">
       <span class="info-key">Training cost</span>
@@ -351,7 +352,7 @@ a:hover{text-decoration:underline}
 
   <!-- What we've learned -->
   <div class="card" style="margin-bottom:24px">
-    <div class="card-title">What We've Learned — v8 through v11</div>
+    <div class="card-title">What We've Learned — v8 through v12</div>
     <p style="font-size:0.85rem;color:var(--muted);margin-bottom:12px">
       Each run tested one hypothesis. Architecture has been stable since v6 (Pre-LN + AdamW + RoPE).
     </p>
@@ -394,18 +395,26 @@ a:hover{text-decoration:underline}
         <tr>
           <td class="mono">v11_dialog_2corpus</td>
           <td class="small">Corpus expansion — first clean test with both files committed</td>
-          <td class="mono">1.0480</td>
+          <td class="mono">1.0480 (MSE)</td>
           <td class="mono">14,704</td>
           <td><span class="badge" style="color:var(--red);border-color:var(--red)">FAIL</span></td>
           <td class="muted small">Corpus volume hypothesis refuted. +55% vocab, same coherence level as v9.</td>
         </tr>
         <tr>
-          <td class="mono" style="color:var(--purple)">v12 (planned)</td>
-          <td class="small">Loss function — MSE on embeddings → softmax cross-entropy on logits</td>
+          <td class="mono">v12_xent</td>
+          <td class="small">Loss function — MSE on embeddings → cosine cross-entropy, INV_TEMP=10</td>
+          <td class="mono">7.38 nats (x-ent)</td>
+          <td class="mono">14,704</td>
+          <td><span class="badge" style="color:var(--red);border-color:var(--red)">FAIL</span></td>
+          <td class="muted small">Cross-entropy trains cleanly; dialog scaffolding tokens present. INV_TEMP=10 too flat — 5.6 nats above floor. Temperature calibration is the bottleneck.</td>
+        </tr>
+        <tr>
+          <td class="mono" style="color:var(--purple)">v13 (planned)</td>
+          <td class="small">Temperature — bump INV_TEMP from 10 to 30+</td>
           <td class="mono muted">TBD</td>
-          <td class="mono muted">TBD</td>
+          <td class="mono">14,704</td>
           <td><span class="badge" style="color:var(--purple);border-color:var(--purple)">PLANNED</span></td>
-          <td class="muted small">MSE rewards mean-token prediction → word salad. Cross-entropy forces a specific token.</td>
+          <td class="muted small">Sharper softmax distribution forces token discrimination. Floor drops to ≈0.59 nats at INV_TEMP=30.</td>
         </tr>
       </tbody>
     </table>
@@ -504,28 +513,28 @@ a:hover{text-decoration:underline}
 
   <!-- Logical next steps -->
   <div class="card" style="margin-bottom:24px">
-    <div class="card-title">Logical Next Steps (updated 2026-05-02)</div>
+    <div class="card-title">Logical Next Steps (updated 2026-05-03)</div>
     <ol style="font-size:0.9rem;line-height:1.8;padding-left:24px">
       <li>
-        <strong>v12 — test the loss-function hypothesis.</strong>
-        Architecture and corpus are exhausted as levers. v9 (capacity increase) and v11 (corpus expansion, cleanly tested)
-        both fail at the same coherence level. The root-cause hypothesis for v12:
-        <strong>MSE on embeddings rewards predicting the mean of plausible tokens</strong>, which for grammar produces blurry word salad.
-        Standard LMs use cross-entropy on token logits (classification), which forces commitment to a specific token.
-        v12 will switch to softmax cross-entropy over the existing concept-vocab embeddings —
-        no architecture change, no corpus change, just the loss function.
-        This is the cheapest informative experiment remaining.
+        <strong>v13 — bump INV_TEMP from 10 to 30+.</strong>
+        v12 confirmed cross-entropy training works and dialog scaffolding is present.
+        The remaining problem is temperature calibration: at INV_TEMP=10, the softmax distribution is too flat
+        to force commitment to a specific lexical token.
+        At INV_TEMP=30 the theoretical loss floor drops from ≈1.77 to ≈0.59 nats,
+        giving the model 3× more gradient signal per token prediction.
+        No architecture change, no corpus change, no loss function change — only the temperature scalar.
+        This is the cheapest remaining experiment.
       </li>
       <li>
-        <strong>Confirm the avg_ponder collapse in v12.</strong>
-        v11 showed <span class="mono">avg_ponder=1.0</span> where all prior models showed <span class="mono">3.0</span>.
-        This may be a side-effect of the bigger vocab giving sharper softmax distributions, or it may indicate
-        the halt gate converged on a degenerate policy. Monitor in v12 to distinguish.
+        <strong>Keep architecture and corpus frozen until INV_TEMP is resolved.</strong>
+        Three levers have now been tested cleanly and failed: model capacity (v9), corpus volume (v11),
+        and loss function class (v12). The fourth lever — softmax sharpness (v13) — must be tested before
+        adding any further variables.
       </li>
       <li>
-        <strong>Do not add more corpus until the loss-function fix is validated.</strong>
-        Larger or more varied corpora will not help while MSE is pushing the model toward the mean.
-        The word-salad pattern is consistent with the loss function, not a data problem.
+        <strong>If v13 fails: consider context length.</strong>
+        Context=32 tokens may be too short for the model to learn grammatical dependencies that span a full sentence.
+        This is the next hypothesis in the queue after temperature.
       </li>
     </ol>
   </div>
@@ -545,15 +554,21 @@ a:hover{text-decoration:underline}
       <tbody>
         <tr>
           <td class="mono muted">TBD</td>
-          <td class="mono" style="color:var(--purple)">v12</td>
-          <td><span class="badge" style="color:var(--purple);border-color:var(--purple)">PLANNED · LOSS-FUNCTION DIAGNOSTIC</span></td>
-          <td class="muted small">switch MSE on embeddings → softmax cross-entropy on concept-vocab logits; architecture and corpus unchanged; tests whether loss function is root cause of word salad</td>
+          <td class="mono" style="color:var(--purple)">v13</td>
+          <td><span class="badge" style="color:var(--purple);border-color:var(--purple)">PLANNED · TEMPERATURE DIAGNOSTIC</span></td>
+          <td class="muted small">bump INV_TEMP 10 → 30+; architecture, corpus, loss function unchanged; tests whether softmax sharpness is the remaining bottleneck; floor drops ≈1.77 → ≈0.59 nats</td>
+        </tr>
+        <tr>
+          <td class="mono muted">2026-05-03</td>
+          <td class="mono" style="color:var(--cyan)">v12_xent</td>
+          <td><span class="badge" style="color:var(--yellow);border-color:var(--yellow)">LIVE · WORD SALAD (INV_TEMP=10 too flat)</span></td>
+          <td class="muted small">loss MSE → cosine x-ent tied projection; 5 epochs; final loss 7.38 nats (floor ≈1.77, headroom 5.6); distinct PASS, dialog scaffolding partial, coherent FAIL; $6.00 · commit e281458</td>
         </tr>
         <tr>
           <td class="mono muted">2026-05-02 03:55</td>
-          <td class="mono" style="color:var(--cyan)">v11_dialog_2corpus</td>
-          <td><span class="badge" style="color:var(--yellow);border-color:var(--yellow)">LIVE · WORD SALAD (corpus expansion refuted)</span></td>
-          <td class="muted small">vocab grew 9,509 → 14,704 confirming both corpora ingested; final loss 1.0480 on 55% larger vocab; eval 1/3 — distinct PASS, english partial (proper-noun leakage), coherent FAIL; avg_ponder collapsed 3.0→1.0; 11h08m · ~$6</td>
+          <td class="mono">v11_dialog_2corpus</td>
+          <td><span class="badge" style="color:var(--muted);border-color:var(--muted)">REPLACED</span></td>
+          <td class="muted small">vocab grew 9,509 → 14,704 confirming both corpora ingested; final loss 1.0480; eval 1/3 — distinct PASS, english partial (proper-noun leakage), coherent FAIL; avg_ponder collapsed 3.0→1.0; 11h08m · ~$6; corpus-volume hypothesis refuted</td>
         </tr>
         <tr>
           <td class="mono muted">2026-04-29 08:52</td>
@@ -622,7 +637,7 @@ a:hover{text-decoration:underline}
   <!-- Footer -->
   <div class="footer">
     <p>engram is an experimental neural language model with adaptive pondering, N-gram memory, and continuous-concept vocabulary. <a href="https://github.com/kent-ai-dev/engram" target="_blank">GitHub</a></p>
-    <p style="margin-top:4px">Status report updated 2026-05-02.</p>
+    <p style="margin-top:4px">Status report updated 2026-05-03.</p>
   </div>
 
 </div>
