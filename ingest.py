@@ -318,7 +318,9 @@ def main():
     vocab_matrix_global = torch.tensor(
         [embed_cache[w] for w in vocab_words_global], dtype=torch.float32
     ).to(DEVICE)
-    INV_TEMPERATURE = 10.0  # cosine sim in [-1,1]; scale up for sharper softmax (CLIP-style)
+    INV_TEMPERATURE = 30.0  # v13: bumped 10 -> 30. v12 plateaued at 7.38 nats with floor 1.77 at INV_TEMP=10
+                            # (5.6 nats of headroom unused). At INV_TEMP=30 the floor drops to ~0.59 nats
+                            # and the gradient signal sharpens. CLIP/SigLIP train near this range.
 
     brain.train()
     engram.train()

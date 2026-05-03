@@ -328,7 +328,26 @@ session. When the prompt's output anywhere contains the
   2. ≥80% of generated tokens are real English words.
   3. ≥3 of 5 chitchat prompts produce a coherent dialog-shaped reply.
 - **Kill**: 5 consecutive iterations with no improvement OR cumulative
-  Modal spend > $50.
+  Modal spend > **$150** (extended from $50 on 2026-05-03 by user — covers
+  the temperature-sweep + corpus-expansion paths).
+- **Cumulative spend through v12**: ~$45.
+- **Active iteration**: v13 (INV_TEMP 10 → 30, single-variable swap from
+  v12). See `plans/V13_PLAN.md`. If v13 fails, escalate to corpus expansion
+  via `HuggingFaceTB/smol-smoltalk` subsampled to 50-80 MB (~10x current).
+
+### Run history (most recent first)
+
+| Run | Hypothesis | Result | Cost | Cumulative |
+|-----|-----------|--------|------|------------|
+| v12_xent | MSE→cosine xent loss (INV_TEMP=10) | FAIL — clean training, word salad | $6 | $45 |
+| v11_dialog_2corpus | Corpus expansion (vocab 9.5k→14.7k) | FAIL — capacity hypothesis refuted | $6 | $39 |
+| v10_dialog_corpus | (dropped — corpus not committed at launch) | N/A | — | $33 |
+| v9_dialog_big | 50M params on dailydialog | FAIL | $6 | $33 |
+| v8_clean | Corpus cleanup | partial improvement (real words) | $5 | $27 |
+| v7_dialog | dailydialog-only | FAIL | $4 | $22 |
+| v6_preln | Pre-LN fix for v5 mode collapse | training stable | $5 | $18 |
+| v5_rope | First Pre-LN attempt | FAIL — mode collapse | $4 | $13 |
+| v4_rope | RoPE positional encoding | first deployable, word salad | $4 | $9 |
 
 Each iteration **must** (in order):
 

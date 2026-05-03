@@ -28,9 +28,11 @@ TEMPERATURE = 0.9
 TOP_K = 10
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Active model: v9_dialog_big (12L/384D/12H/RoPE, trained 2026-04-28 on Modal L4).
+# Active model: v12_xent (12L/384D/12H/RoPE, trained 2026-05-03 on Modal L4, vocab=14704).
+# Same architecture/corpus as v11; loss switched MSE-on-embeddings → temperature-scaled
+# cosine cross-entropy at INV_TEMP=10. Final xent loss 7.38 (floor at this temp ~1.77).
 # To roll back, change ACTIVE_MODEL to a previous models/<variant> dir.
-ACTIVE_MODEL = "v9_dialog_big"
+ACTIVE_MODEL = "v12_xent"
 _model_dir = os.path.join(BASE_DIR, "models", ACTIVE_MODEL)
 if os.path.exists(os.path.join(_model_dir, "engram_weights.pth")):
     WEIGHTS_PATH = os.path.join(_model_dir, "engram_weights.pth")
@@ -206,8 +208,13 @@ def load_model():
         word_to_id = None
         if os.path.exists(ENGRAM_PATH) and os.path.exists(W2ID_PATH):
             try:
-                engram_module = EngramModule(embed_dim)
-                engram_module.load_state_dict(torch.load(ENGRAM_PATH, weights_only=True))
+                engram_state = torch.load(ENGRAM_PATH, weights_only=True)
+                if "bigram_table.weight" in engram_state:
+                    ngram_table_size = engram_state["bigram_table.weight"].shape[0]
+                else:
+                    ngram_table_size = 50021
+                engram_module = EngramModule(embed_dim, table_size=ngram_table_size)
+                engram_module.load_state_dict(engram_state)
                 engram_module.eval()
                 word_to_id = torch.load(W2ID_PATH, weights_only=False)
                 print(f"Loaded EngramModule ({len(word_to_id):,} word IDs)")

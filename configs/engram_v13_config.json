@@ -1,0 +1,18 @@
+{
+  "_comment": "v13: bump cosine cross-entropy temperature from INV_TEMP=10 to INV_TEMP=30. v12 cleanly trained xent (8.16 -> 7.38 nats) but plateaued 5.6 nats above the theoretical floor at INV_TEMP=10 (~1.77). At INV_TEMP=30 the softmax sharpens and the floor drops to ~0.59 nats — gradient signal per token is much stronger when the model is wrong. Single-variable test, all other hyperparameters identical to v12_xent. Architecture and corpus frozen at v11/v12 (controls). If v13 still produces word salad, the loss-temperature path is exhausted and the next move is corpus expansion at 10-20x scale (smol-smoltalk subsample).",
+  "EMBED_DIM": 384,
+  "N_LAYERS": 12,
+  "CONTEXT_SIZE": 32,
+  "N_HEADS": 12,
+  "BATCH_SIZE": 96,
+  "BRAIN_LR": 1e-3,
+  "EMBED_LR": 5e-4,
+  "EPOCHS": 5,
+  "INV_TEMPERATURE": 30.0,
+  "CHROMA_PATH": "./engram_memory",
+  "NGRAM_TABLE_SIZE": 100003,
+  "BOOKS": [
+    "corpus/dailydialog_clean.txt",
+    "corpus/everyday_conversations.txt"
+  ]
+}
