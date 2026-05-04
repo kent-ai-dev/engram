@@ -12,8 +12,19 @@ v13 holds architecture and corpus identical to v12 and only changes `INV_TEMPERA
 |----------------|-----------|------------|
 | **PASS** — distinct + ≥80% English + ≥3/5 chitchat coherent | Loss temperature was the calibration block. Every prior architectural innovation was *latent* — already correct, just under-trained. | **Archive loop.** Emit `ENGRAM_COHERENT`. v14 is unnecessary. Document the calibration lesson and ship. |
 | **PARTIAL** — distinct, mostly real English, sentence-shape but not yet coherent | Temperature dimension exhausted; the model has the right tokens but not the right *compute allocation* per token. | **Branch A: Stronger Adaptive Pondering** (engram innovation #3 — adaptive compute) |
+| **PARTIAL — uniform confidence** — distinct replies but model is equally confident on "hello" and "what is the capital of france" (no surprise differentiation) | The model is treating every token as equally important during training. Hard tokens never received outsized gradient. | **Branch D: Surprise-Modulated Gradient** (engram innovation #4 — signal-modulated learning) |
 | **FAIL** — clean loss plateau (~0.6 nats, near floor) but eval is still word-salad | The cross-entropy classifier converged against the available embedding geometry — there's no more signal to extract from frozen sentence-transformer vectors. | **Branch B: Learnable ChromaDB Embeddings** (engram innovation #1 — vocab/brain separation, vocab geometry as bottleneck) |
 | **FAIL — no convergence** — loss still descending at 5+ nats above floor at epoch 5 | Even sharp xent at INV_TEMP=30 isn't enough. The fixed inputs are starving the gradient. | **Branch C: Episodic Memory at Training Time** (engram innovation #5 — recall as training signal, not just inference garnish) |
+
+**Coverage of the five engram-vs-frontier axes:**
+
+| Axis | Branch |
+|------|--------|
+| #1 Vocabulary external | Branch B |
+| #2 Memory as separate organ | Branch C (episodic); N-gram is already in train loop |
+| #3 Adaptive compute per token | Branch A |
+| #4 Signal-modulated learning | **Branch D** |
+| #5 Persistence architectural | Branch C (training-time engagement; runtime persistence is an eval-side concern) |
 
 The autonomous loop's `current_hypothesis` field gets updated to whichever branch fires, and a `plans/V14_*_PLAN.md` is written before launch.
 
@@ -146,6 +157,54 @@ If episodic gate weights collapse to ~0 by end of training, the model decided re
 
 ---
 
+## Branch D — Surprise-Modulated Gradient
+
+### Hypothesis
+
+> The README claims engram has "high prediction error → up to 3× gradient" — surprise-gated learning, innovation #4 of the architectural distinguishing list. But this mechanism was tied to v6–v11's MSE-on-embeddings loss and was silently dropped in v12 when the loss switched to cross-entropy. The current `ingest.py:414` is a plain `F.cross_entropy(logits, target_global_idx)` — every token in every batch contributes equally to the gradient. That means engram is, in this respect, **identical to a stock transformer**: uniform learning rate per sample, no dopaminergic modulation. v14-D restores surprise-gating in the cross-entropy regime to test whether the dopamine analogue actually helps.
+
+### Innovation engaged
+
+**Innovation #4 — Surprise-gated learning (signal-modulated, not uniform).** Currently dormant in v12/v13. v14-D makes per-sample loss contribution scale with how surprised the model is at the true token. High xent → larger contribution → effectively up to 3× gradient on hard examples. Low xent → near-baseline contribution.
+
+### Single-variable change
+
+In `ingest.py` per-batch loop (around line 414):
+
+```python
+# v14-D: surprise-gated per-sample reweighting.
+# Compute per-sample xent (not mean), then scale each by its own surprise relative
+# to the batch mean. Cap at 3x to match the README claim and prevent any single
+# extreme example from dominating the batch.
+per_sample_xent = F.cross_entropy(logits, target_global_idx, reduction='none')  # (B,)
+with torch.no_grad():
+    batch_mean = per_sample_xent.mean()
+    surprise_scale = torch.clamp(per_sample_xent / (batch_mean + 1e-8), max=3.0)
+ce_loss = (per_sample_xent * surprise_scale).mean()
+```
+
+All other hyperparameters frozen at v13 values (`INV_TEMPERATURE=30`, ponder cap=3, ponder_cost=0.05, frozen vocab).
+
+### Eval signal
+
+- During training: the `surprise_scale` distribution should *broaden* over epochs as the model gets confident on common tokens (so their scale → low) and stays surprised on rare/contextual ones (scale stays high). Log per-batch min/median/max of `surprise_scale` to confirm the lever is doing something.
+- Post-training: confidence should be **non-uniform** across the eval prompt buckets. Greetings ("hello") should produce sharper, more confident replies than harder prompts ("why is the sky blue"). v12/v13 currently produce equally confident outputs across all difficulty levels — a hallmark of uniform per-sample weighting.
+- Diagnostic: run inference on greetings vs. harder prompts and compare the top-1 cosine score on the chosen token. If they're similar, surprise-gating didn't differentiate; if greetings >> harder, the lever worked.
+
+### Cost: ~$6
+
+Same wall time as v13 — surprise-gated reweighting is one extra mean-and-clamp per batch, negligible compared to the brain forward pass. Same epochs, same corpus, same architecture.
+
+### Failure mode
+
+If `surprise_scale` distribution stays roughly uniform (most samples ~1.0, no broadening), the model's xent is too uniform across the corpus to begin with — meaning either (a) the corpus is too homogeneous, or (b) the model isn't strong enough to be confident on anything. Either way it would say signal-modulation isn't the bottleneck and we'd escalate to a different branch.
+
+### Why this branch was added late
+
+The original V14_CANDIDATES.md draft (commit `0e701c6`) covered axes #1, #2, #3, and partially #5 — but missed axis #4 because surprise-gating was tied to MSE in v6–v11 and got silently dropped during the v12 loss-function swap. Re-adding it in xent form is a single-variable swap on its own, and not testing it would let the loop close out "all engram architectural bets explored" while one of the five distinguishing axes was never actually exercised in the current loss regime. That would be a false-confidence outcome.
+
+---
+
 ## What's intentionally NOT chosen
 
 ### Corpus expansion (`smol-smoltalk` 50–80 MB subsample)
@@ -168,22 +227,24 @@ v9 already refuted capacity (3.5× params on same corpus produced same word-sala
 |-----|------------------------|-----------------|
 | v9–v12 (already spent) | ~45 | 30% |
 | v13 (in flight) | ~51 | 34% |
-| v14 (Branch A or B) | ~59 | 39% |
+| v14 (Branch A, B, or D) | ~57–59 | 38–39% |
 | v14-C if chosen | ~63 | 42% |
 | v15 fallback (corpus) | ~71-75 | 47-50% |
 
-We have substantial runway under the $150 ceiling — at least 5 more iterations possible at current per-run cost.
+We have substantial runway under the $150 ceiling — even if all four branches (A through D) were run sequentially, total would be ~$77 (~51%).
 
 ---
 
 ## Update flow when v13 lands
 
 1. `eval_chat.py` produces transcript at `eval_runs/chat_<ts>.json`.
-2. Read transcript, classify into PASS / PARTIAL / FAIL-clean-plateau / FAIL-no-convergence.
-3. Based on table above, pick branch.
+2. Read transcript, classify into PASS / PARTIAL / PARTIAL-uniform-confidence / FAIL-clean-plateau / FAIL-no-convergence.
+3. Based on table above, pick branch (A, B, C, or D).
 4. Write `plans/V14_<branch>_PLAN.md` (full single-variable spec, copy from this doc's branch section + add hard-won-lessons).
 5. Update `.claude/ralph-loop.local.md`: bump `current_hypothesis`, `current_run`, increment iteration.
 6. Edit `ingest.py` (and `engram_model.py` for Branch A) for the chosen single-variable swap.
 7. Commit + push to main (Modal git-clones main).
 8. Launch via the standard Modal direct-CLI pattern (the `modal_train.py launch --config` wrapper has a flag-passing bug; use `python3 -m modal run --detach scripts/modal_train.py --config-path <file>` directly).
 9. ScheduleWakeup 1800s for the next loop tick.
+
+**Note on PARTIAL-uniform-confidence vs PARTIAL distinction:** if v13 eval shows real-English replies but they're uniformly confident across difficulty levels (e.g. greetings and harder prompts produce equally tight cosine scores), prefer Branch D. If replies are sentence-shaped but uniformly *off-topic* regardless of difficulty, prefer Branch A. Both can be sequential if the first doesn't fully fix coherence.
