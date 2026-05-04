@@ -1,0 +1,23 @@
+{
+  "_comment": "v14-Branch B: Make ChromaDB vocab embeddings learnable nn.Parameter. Hypothesis: v13 plateaued (final loss 5.04, ~4.45 nats above 0.59 floor at INV_TEMP=30) and produced word-salad output despite a confident brain. Brain learns to predict in directions of frozen sentence-transformer geometry, which optimizes for semantic similarity not syntactic prediction. Letting vocab move under xent gradient tests whether vocab geometry is the residual bottleneck. Single-variable change: vocab_matrix_global -> nn.Parameter, added to AdamW with lr=EMBED_LR/2=2.5e-4. Brain weights warm-started from v13 final and frozen for epoch 0 (so vocab adjusts against fixed predictions) then unfrozen for epoch 1+. Architecture, corpus, INV_TEMPERATURE all frozen at v13 values.",
+  "EMBED_DIM": 384,
+  "N_LAYERS": 12,
+  "CONTEXT_SIZE": 32,
+  "N_HEADS": 12,
+  "BATCH_SIZE": 96,
+  "BRAIN_LR": 1e-3,
+  "EMBED_LR": 5e-4,
+  "EPOCHS": 5,
+  "INV_TEMPERATURE": 30.0,
+  "CHROMA_PATH": "./engram_memory",
+  "NGRAM_TABLE_SIZE": 100003,
+  "BOOKS": [
+    "corpus/dailydialog_clean.txt",
+    "corpus/everyday_conversations.txt"
+  ],
+  "ENV": {
+    "V14B_INIT_BRAIN": "/engram-weights/engram_weights.pth",
+    "V14B_INIT_ENGRAM": "/engram-weights/engram_memory_module.pth",
+    "V14B_INIT_VOCAB": "/engram-weights/engram_memory"
+  }
+}

@@ -34,6 +34,15 @@ EMBED_LR = 5e-4
 EPOCHS = 5
 CHROMA_PATH = "./engram_memory"
 
+# v14-B: optional warm-start from a prior run (paths set via env). When set,
+# brain weights load from V14B_INIT_BRAIN, engram module from V14B_INIT_ENGRAM.
+# Brain is frozen for epoch 0 so the learnable vocab can adjust to its existing
+# predictions, then unfrozen for epoch 1+. Isolates vocab-as-bottleneck from
+# brain-as-bottleneck per plans/V14_CANDIDATES.md Branch B.
+V14B_INIT_BRAIN = os.environ.get("V14B_INIT_BRAIN", "")
+V14B_INIT_ENGRAM = os.environ.get("V14B_INIT_ENGRAM", "")
+V14B_FREEZE_BRAIN_EPOCH_0 = bool(V14B_INIT_BRAIN)
+
 # Device selection: use CUDA if available, else CPU
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"[engram] Using device: {DEVICE}")
@@ -281,6 +290,33 @@ def main():
 
     embed_cache = {w: torch.randn(EMBED_DIM).tolist() for w in unique_words}
 
+    # v14-B: optionally warm-start embed_cache from a prior run's ChromaDB
+    # (so brain weights loaded from V14B_INIT_BRAIN see the same vocab geometry
+    # they were trained against — without this, the loaded brain has no
+    # relationship to the random-init vocab and learning would restart from
+    # scratch).
+    V14B_INIT_VOCAB = os.environ.get("V14B_INIT_VOCAB", "")
+    if V14B_INIT_VOCAB and os.path.isdir(V14B_INIT_VOCAB):
+        print(f"[v14-B] Loading vocab embeddings from {V14B_INIT_VOCAB}")
+        try:
+            _src_client = chromadb.PersistentClient(path=V14B_INIT_VOCAB)
+            _src_coll = _src_client.get_collection("engram_vocab")
+            _all = _src_coll.get(include=["embeddings"])
+            _loaded = 0
+            for _w, _e in zip(_all["ids"], _all["embeddings"]):
+                if _w in embed_cache:
+                    embed_cache[_w] = list(_e)
+                    _loaded += 1
+            print(f"[v14-B] Warm-started {_loaded:,} / {len(embed_cache):,} vocab vectors from prior run")
+            try:
+                _src_client._producer = None
+                _src_client._consumer = None
+            except Exception:
+                pass
+            del _src_client, _src_coll, _all
+        except Exception as _e:
+            print(f"[v14-B] WARNING: vocab warm-start failed: {_e} — using random init")
+
 
 
     # Build word_to_id mapping for N-gram hashing
@@ -290,6 +326,20 @@ def main():
     engram = EngramModule(EMBED_DIM)
     brain.to(DEVICE)
     engram.to(DEVICE)
+
+    # v14-B: warm-start brain + engram from prior run (env-gated). Loaded BEFORE
+    # the optimizer is constructed so AdamW sees only the learning params.
+    if V14B_INIT_BRAIN and os.path.exists(V14B_INIT_BRAIN):
+        print(f"[v14-B] Loading brain weights from {V14B_INIT_BRAIN}")
+        brain.load_state_dict(torch.load(V14B_INIT_BRAIN, map_location=DEVICE))
+    if V14B_INIT_ENGRAM and os.path.exists(V14B_INIT_ENGRAM):
+        print(f"[v14-B] Loading engram module from {V14B_INIT_ENGRAM}")
+        engram.load_state_dict(torch.load(V14B_INIT_ENGRAM, map_location=DEVICE))
+    if V14B_FREEZE_BRAIN_EPOCH_0:
+        for p in brain.parameters():
+            p.requires_grad = False
+        print("[v14-B] Brain frozen for epoch 0; will unfreeze at epoch 1")
+
     all_params = list(brain.parameters()) + list(engram.parameters())
     # AdamW with weight decay — without it, MSE training on broad target
     # distributions converges to "predict the mean" (v4/v5 mode collapse).
@@ -314,10 +364,17 @@ def main():
     # tracks the slow drift from the per-batch write-back at the bottom of the loop.
     vocab_words_global = list(embed_cache.keys())
     word_to_global_idx = {w: i for i, w in enumerate(vocab_words_global)}
-    print(f"v12 cross-entropy mode: vocab_matrix shape = ({len(vocab_words_global):,}, {EMBED_DIM})")
-    vocab_matrix_global = torch.tensor(
-        [embed_cache[w] for w in vocab_words_global], dtype=torch.float32
-    ).to(DEVICE)
+    print(f"v14-B cross-entropy mode: vocab_matrix shape = ({len(vocab_words_global):,}, {EMBED_DIM}) — LEARNABLE")
+    # v14-B: vocab_matrix_global is now an nn.Parameter trained alongside the brain.
+    # Initialized from embed_cache (warm-started from v13's ChromaDB if V14B_INIT_VOCAB
+    # is set, otherwise random Gaussian), then refined by xent gradient. This tests
+    # whether the v13 plateau is a frozen-vocab-geometry bottleneck — i.e. whether the
+    # brain has learned to predict in a direction the frozen vocab can't represent.
+    # EMBED_LR/2 = 2.5e-4 to keep vocab moves slower than brain updates.
+    vocab_matrix_global = nn.Parameter(
+        torch.tensor([embed_cache[w] for w in vocab_words_global], dtype=torch.float32).to(DEVICE)
+    )
+    optimizer.add_param_group({"params": [vocab_matrix_global], "lr": EMBED_LR * 0.5})
     INV_TEMPERATURE = 30.0  # v13: bumped 10 -> 30. v12 plateaued at 7.38 nats with floor 1.77 at INV_TEMP=10
                             # (5.6 nats of headroom unused). At INV_TEMP=30 the floor drops to ~0.59 nats
                             # and the gradient signal sharpens. CLIP/SigLIP train near this range.
@@ -327,13 +384,15 @@ def main():
 
     for epoch in range(EPOCHS):
 
-        # Refresh vocab snapshot from embed_cache (which has drifted via per-batch write-back)
-        if epoch > 0:
-            with torch.no_grad():
-                vocab_matrix_global.copy_(torch.tensor(
-                    [embed_cache[w] for w in vocab_words_global], dtype=torch.float32
-                ).to(DEVICE))
-        vocab_matrix_normed = F.normalize(vocab_matrix_global, dim=-1)  # (V, D), constant for this epoch
+        # v14-B: unfreeze brain at epoch 1 (frozen during epoch 0 to let vocab
+        # adjust against fixed brain predictions; then full joint training resumes).
+        if V14B_FREEZE_BRAIN_EPOCH_0 and epoch == 1:
+            for p in brain.parameters():
+                p.requires_grad = True
+            print(f"[v14-B] Epoch {epoch}: brain unfrozen — joint vocab+brain training resumes")
+        # v14-B: vocab_matrix_global is a learnable Parameter — no refresh from
+        # embed_cache (that would clobber learned vocab). vocab_matrix_normed is
+        # now computed inside the per-batch loop so gradient flows through it.
 
         random.shuffle(sequences)
 
@@ -406,6 +465,9 @@ def main():
             # v12: temperature-scaled cosine cross-entropy. Logits = cosine similarity
             # between L2-normalized prediction and L2-normalized vocab, scaled by
             # INV_TEMPERATURE so softmax is sharp enough to commit (CLIP-style).
+            # v14-B: vocab_matrix_normed is computed per-batch (vocab is a learnable
+            # Parameter so its norms change every step).
+            vocab_matrix_normed = F.normalize(vocab_matrix_global, dim=-1)
             predicted_norm = F.normalize(predicted, dim=-1)
             target_global_idx = torch.tensor(
                 [word_to_global_idx[w] for w in target_words], dtype=torch.long
@@ -485,6 +547,16 @@ def main():
             print(f"  [checkpoint] WARNING: per-epoch save failed: {ckpt_err}")
 
 
+
+    # v14-B: the learnable vocab_matrix_global is the source of truth for vocab
+    # embeddings — sync it back into embed_cache so the ChromaDB write below
+    # reflects the LEARNED vocab geometry, not the initial sentence-transformer
+    # init. (Without this, the whole point of Branch B is lost at deploy time.)
+    print(f"\n[v14-B] Syncing learned vocab_matrix_global -> embed_cache ({len(vocab_words_global):,} words)")
+    with torch.no_grad():
+        vocab_cpu = vocab_matrix_global.detach().cpu()
+        for w, i in word_to_global_idx.items():
+            embed_cache[w] = vocab_cpu[i].tolist()
 
     # Normalize embeddings before saving
 

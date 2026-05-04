@@ -28,11 +28,11 @@ TEMPERATURE = 0.9
 TOP_K = 10
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Active model: v12_xent (12L/384D/12H/RoPE, trained 2026-05-03 on Modal L4, vocab=14704).
-# Same architecture/corpus as v11; loss switched MSE-on-embeddings → temperature-scaled
-# cosine cross-entropy at INV_TEMP=10. Final xent loss 7.38 (floor at this temp ~1.77).
+# Active model: v13_xent_temp30 (12L/384D/12H/RoPE, trained 2026-05-04 on Modal L4, vocab=14704).
+# Single-variable swap from v12: INV_TEMPERATURE 10→30 to sharpen the cross-entropy gradient.
+# Final xent loss 5.04 (floor at this temp ~0.59); v12 was 7.38 (floor 1.77).
 # To roll back, change ACTIVE_MODEL to a previous models/<variant> dir.
-ACTIVE_MODEL = "v12_xent"
+ACTIVE_MODEL = "v13_xent_temp30"
 _model_dir = os.path.join(BASE_DIR, "models", ACTIVE_MODEL)
 if os.path.exists(os.path.join(_model_dir, "engram_weights.pth")):
     WEIGHTS_PATH = os.path.join(_model_dir, "engram_weights.pth")
