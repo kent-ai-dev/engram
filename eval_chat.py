@@ -189,8 +189,13 @@ def main():
     engram_module = None
     word_to_id = None
     if os.path.exists(ENGRAM_PATH) and os.path.exists(W2ID_PATH):
-        engram_module = EngramModule(embed_dim)
-        engram_module.load_state_dict(torch.load(ENGRAM_PATH, weights_only=True))
+        engram_state = torch.load(ENGRAM_PATH, weights_only=True)
+        if "bigram_table.weight" in engram_state:
+            ngram_table_size = engram_state["bigram_table.weight"].shape[0]
+        else:
+            ngram_table_size = 50021
+        engram_module = EngramModule(embed_dim, table_size=ngram_table_size)
+        engram_module.load_state_dict(engram_state)
         word_to_id = torch.load(W2ID_PATH, weights_only=False)
         engram_module.eval()
         print(f"  engram_module loaded ({len(word_to_id):,} word IDs)")
