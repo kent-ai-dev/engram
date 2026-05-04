@@ -248,3 +248,16 @@ We have substantial runway under the $150 ceiling — even if all four branches 
 9. ScheduleWakeup 1800s for the next loop tick.
 
 **Note on PARTIAL-uniform-confidence vs PARTIAL distinction:** if v13 eval shows real-English replies but they're uniformly confident across difficulty levels (e.g. greetings and harder prompts produce equally tight cosine scores), prefer Branch D. If replies are sentence-shaped but uniformly *off-topic* regardless of difficulty, prefer Branch A. Both can be sequential if the first doesn't fully fix coherence.
+
+---
+
+## After v14 — see plans/FUTURE_RESEARCH.md
+
+When all four v14 branches (A/B/C/D) have been tested without producing ENGRAM_COHERENT, escalate to the v15+ research backlog at [`plans/FUTURE_RESEARCH.md`](FUTURE_RESEARCH.md). Four candidates queued there from 2026 research:
+
+1. **∇-Reasoner** (test-time gradient descent in latent space, March 2026) — zero training cost, prototype against any trained engram model
+2. **Unbounded recurrent depth** (Geiping et al., NeurIPS 2025/2026) — natural extension of Branch A if pondering lever proves engaged
+3. **Predictive Coding Networks** (Sussex thesis, April 2026) — principled architectural version of Branch D's surprise modulation if scalar approximation shows promising-but-unstable behavior
+4. **Test-Time Training for episodic memory** (Sun, Choi et al., January 2026) — refinement of Branch C if existing episodic mechanism is validated in training loop
+
+Each has explicit prerequisites among v14 branches (no jumping ahead) and engineering-cost estimates. **∇-Reasoner is the recommended first v15 candidate** — it's pure inference enhancement and works against any existing trained model.
