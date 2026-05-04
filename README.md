@@ -159,3 +159,60 @@ In `test_brain.py`:
 - N-gram tables give the brain direct access to phrase-level patterns without using attention layers
 
 The biggest lever for quality improvement is **more training data**. Drop `.txt` files into `corpus/` folder and re-run `ingest.py`.
+
+## Scholarly Support for the Thesis
+
+Each of Engram's architectural bets has independent published support. The combination is novel; the individual ingredients are not speculative.
+
+### 1. Conditional memory / lookup-as-sparsity
+**Direct validation.** DeepSeek's *Engram* paper (Cheng et al., Jan 2026) is the strongest hit — same name, same thesis: hash-indexed N-gram tables as a complementary sparsity axis to MoE. They scaled to 27B params and report **reasoning gains exceeding knowledge gains** (BBH +5.0, ARC-C +3.7 vs MMLU +3.4) — directly supporting the claim that lookup *frees* neural compute for reasoning rather than just storing facts. Follow-on work *Pooling Engram Conditional Memory using CXL* (arXiv 2603.10087) treats engram tables as a pooled hardware resource.
+
+- [Conditional Memory via Scalable Lookup (Cheng et al., 2026)](https://arxiv.org/abs/2601.07372)
+- [DeepSeek Engram repo](https://github.com/deepseek-ai/Engram)
+- [Pooling Engram Conditional Memory using CXL](https://arxiv.org/html/2603.10087v1)
+
+### 2. Adaptive pondering
+**Direct lineage.** PonderNet (Banino et al., 2021, arXiv 2107.05407) is the canonical citation — probabilistic halt gate, geometric prior, KL regularization. PonderNet beat Universal Transformer on bAbI using 6× fewer steps. Engram's `halt_gate` in `engram_model.py:217` is a direct port. Recent extensions: *AdaPonderLM* (token-wise adaptive depth) and *AHT-ViT* (vision transformers).
+
+- [PonderNet: Learning to Ponder (Banino et al., 2021)](https://arxiv.org/pdf/2107.05407)
+- [AdaPonderLM: Gated Pondering with Token-Wise Adaptive Depth](https://arxiv.org/html/2603.01914)
+
+### 3. Latent-space reasoning (vs token-space CoT)
+**Strong validation.** Meta's COCONUT (Hao et al., NeurIPS 2024) makes Engram's case explicitly: *"language space may not always be optimal for reasoning."* They feed hidden states back as next-step embeddings rather than decoding to text, and show it beats CoT on logical reasoning while emitting fewer tokens. Engram's pondering loop is the same idea — reasoning happens in concept space, not in emitted words.
+
+- [Training LLMs to Reason in Continuous Latent Space (COCONUT)](https://arxiv.org/abs/2412.06769)
+- [COCONUT GitHub (Meta)](https://github.com/facebookresearch/coconut)
+
+### 4. Surprise-gated learning
+**Strong neuroscience grounding, weaker ML grounding.** The dopamine/RPE literature is bulletproof — Schultz's reward prediction error coding, Diederen & Fletcher's *"Dopamine, Prediction Error and Beyond"*, and the recent *Cell* paper *"Dopamine encodes deep network teaching signals for individual learning trajectories"* all support the brain-inspired story. The ML translation — *scale gradient by prediction error* — is less common in published work; closest analogues are precision-weighted prediction errors in active inference and curriculum/hard-example mining. **This is the thesis pillar with the thinnest direct ML citation support and the most original-research risk.**
+
+- [Dopamine, Prediction Error and Beyond (Diederen & Fletcher)](https://pmc.ncbi.nlm.nih.gov/articles/PMC7804370/)
+- [Dopamine encodes deep network teaching signals (Cell, 2025)](https://www.cell.com/cell/fulltext/S0092-8674(25)00575-6)
+- [Striatal dopamine signals errors in prediction (Sci Adv)](https://www.science.org/doi/10.1126/sciadv.adq9684)
+
+### 5. Episodic memory as a separate organ
+**Mainstream and accelerating.** *"Towards LLMs with human-like episodic memory"* (Trends in Cognitive Sciences, Dong et al., 2025), *"Position: Episodic Memory is the Missing Piece for Long-Term LLM Agents"* (arXiv 2502.06975), and the systematic review *Memory-Augmented Transformers* (arXiv 2508.10824) all argue the same separation Engram bets on. *MemReasoner* and the multi-tier memory taxonomy (Core/Episodic/Semantic/Procedural) treat episodic store as architecturally distinct.
+
+- [Towards LLMs with human-like episodic memory (TiCS)](https://www.cell.com/trends/cognitive-sciences/abstract/S1364-6613(25)00179-2)
+- [Episodic Memory is the Missing Piece for Long-Term LLM Agents](https://arxiv.org/pdf/2502.06975)
+- [A neural network model of when to retrieve and encode episodic memories (eLife)](https://elifesciences.org/articles/74445)
+- [Memory-Augmented Transformers: A Systematic Review](https://arxiv.org/pdf/2508.10824)
+- [MemReasoner architecture](https://openreview.net/pdf?id=ODcMy97cVZ)
+
+### 6. Decoupled vocabulary
+**Partial validation.** Meta's Byte-Latent Transformer (BLT) demonstrates that fixed-vocabulary tokenization is unnecessary at 8B scale with **50% fewer inference FLOPs**. Engram's ChromaDB-vocab approach is more radical (vocabulary as a runtime-extensible vector DB rather than a baked tokenizer), but the *direction* — decouple model from vocabulary — is now an active research program.
+
+- [Why Your Next LLM Might Not Have A Tokenizer (BLT overview)](https://towardsdatascience.com/why-your-next-llm-might-not-have-a-tokenizer/)
+
+### Summary
+
+| Pillar | Independent peer support | Verdict |
+|---|---|---|
+| Conditional memory | DeepSeek Engram (Cheng 2026) | Validated at 27B scale |
+| Adaptive pondering | PonderNet, AdaPonderLM | Established subfield |
+| Latent reasoning | COCONUT (Meta, NeurIPS '24) | Validated, beats CoT |
+| Episodic memory | TiCS 2025, MAT survey, MemReasoner | Mainstream consensus |
+| Decoupled vocab | BLT (Meta) | Active research, not yet dominant |
+| Surprise-gated grad | Dopamine/RPE neuroscience only | Original — weakest ML citation |
+
+Four of six pillars have direct, recent, peer-reviewed support from frontier labs (DeepSeek, Meta, DeepMind). The surprise-gated learning rule is the most original — and therefore the most worth running ablations on.
