@@ -1,0 +1,24 @@
+{
+  "_comment": "v15-Branch A: Stronger Adaptive Pondering. Hypothesis: v14-B confirmed Branch B (vocab geometry was the v13 bottleneck) and produced the cleanest output yet, but avg_ponder still pegs at 3.00 — the cap. The halt gate isn't engaging the adaptive-compute lever. Branch A lifts the cap and lowers the cost so the gate has reason to ponder longer on harder tokens. Single-variable change pair (coupled): MAX_PONDER 3 → 5 in engram_model.py, ponder_cost 0.05 → 0.02 in ingest.py. Brain warm-started from v14-B; freeze disabled (Branch A is not isolating vocab). All other hyperparameters frozen at v14-B values: vocab learnable, INV_TEMPERATURE=30.",
+  "EMBED_DIM": 384,
+  "N_LAYERS": 12,
+  "CONTEXT_SIZE": 32,
+  "N_HEADS": 12,
+  "BATCH_SIZE": 96,
+  "BRAIN_LR": 1e-3,
+  "EMBED_LR": 5e-4,
+  "EPOCHS": 5,
+  "INV_TEMPERATURE": 30.0,
+  "CHROMA_PATH": "./engram_memory",
+  "NGRAM_TABLE_SIZE": 100003,
+  "BOOKS": [
+    "corpus/dailydialog_clean.txt",
+    "corpus/everyday_conversations.txt"
+  ],
+  "ENV": {
+    "V14B_INIT_BRAIN": "/engram-weights/engram_weights.pth",
+    "V14B_INIT_ENGRAM": "/engram-weights/engram_memory_module.pth",
+    "V14B_INIT_VOCAB": "/engram-weights/engram_memory",
+    "V14B_FREEZE_BRAIN_EPOCH_0": "false"
+  }
+}

@@ -34,14 +34,22 @@ EMBED_LR = 5e-4
 EPOCHS = 5
 CHROMA_PATH = "./engram_memory"
 
-# v14-B: optional warm-start from a prior run (paths set via env). When set,
-# brain weights load from V14B_INIT_BRAIN, engram module from V14B_INIT_ENGRAM.
-# Brain is frozen for epoch 0 so the learnable vocab can adjust to its existing
-# predictions, then unfrozen for epoch 1+. Isolates vocab-as-bottleneck from
-# brain-as-bottleneck per plans/V14_CANDIDATES.md Branch B.
+# v14-B / v15-A: optional warm-start from a prior run (paths set via env). When
+# the brain init path is set, brain weights load from V14B_INIT_BRAIN and engram
+# module from V14B_INIT_ENGRAM. The freeze-brain-for-epoch-0 lever is now an
+# explicit env flag so subsequent branches (e.g. v15-A pondering) can warm-start
+# without freezing — Branch B needed the freeze to isolate vocab; Branch A does
+# not. Default: freeze if init is set (preserves Branch B behavior), unless
+# V14B_FREEZE_BRAIN_EPOCH_0=false explicitly opts out.
 V14B_INIT_BRAIN = os.environ.get("V14B_INIT_BRAIN", "")
 V14B_INIT_ENGRAM = os.environ.get("V14B_INIT_ENGRAM", "")
-V14B_FREEZE_BRAIN_EPOCH_0 = bool(V14B_INIT_BRAIN)
+_freeze_env = os.environ.get("V14B_FREEZE_BRAIN_EPOCH_0", "").lower()
+if _freeze_env in ("false", "0", "no", "off"):
+    V14B_FREEZE_BRAIN_EPOCH_0 = False
+elif _freeze_env in ("true", "1", "yes", "on"):
+    V14B_FREEZE_BRAIN_EPOCH_0 = True
+else:
+    V14B_FREEZE_BRAIN_EPOCH_0 = bool(V14B_INIT_BRAIN)  # legacy default
 
 # Device selection: use CUDA if available, else CPU
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -475,7 +483,8 @@ def main():
             logits = (predicted_norm @ vocab_matrix_normed.T) * INV_TEMPERATURE  # (B, V)
             ce_loss = F.cross_entropy(logits, target_global_idx)
 
-            ponder_cost = 0.05 * ponder_steps  # encourage halt gate to stop early for easy tokens
+            ponder_cost = 0.02 * ponder_steps  # v15-A: lowered 0.05 → 0.02 alongside max_ponder 3 → 5
+                                                # so halt gate has incentive to actually use the deeper budget
 
             # Coherence penalty (v6-v11) was a hack to align MSE prediction with n-gram
             # direction. Cross-entropy already forces commitment to a specific token,
