@@ -1,0 +1,25 @@
+{
+  "_comment": "v15-Branch D: Surprise-Modulated Gradient. Hypothesis: README claims engram has 'high prediction error → up to 3× gradient' (innovation #4 — signal-modulated learning) but this mechanism was tied to MSE in v6-v11 and silently dropped in v12 when loss switched to xent. Currently every token contributes equally to the gradient — engram is, in this respect, identical to a stock transformer. Branch D restores surprise-gating in xent regime: per-sample xent scaled by surprise relative to batch mean, capped at 3x. Single-variable change in ingest.py loss path. Brain warm-started from v14-B; no freeze (Branch B already isolated vocab). v14-A was attempted but Modal GPU contention prevented completion — pivoting to D since it covers the only engram axis (#4) not yet exercised under xent.",
+  "EMBED_DIM": 384,
+  "N_LAYERS": 12,
+  "CONTEXT_SIZE": 32,
+  "N_HEADS": 12,
+  "BATCH_SIZE": 96,
+  "BRAIN_LR": 1e-3,
+  "EMBED_LR": 5e-4,
+  "EPOCHS": 5,
+  "INV_TEMPERATURE": 30.0,
+  "CHROMA_PATH": "./engram_memory",
+  "NGRAM_TABLE_SIZE": 100003,
+  "BOOKS": [
+    "corpus/dailydialog_clean.txt",
+    "corpus/everyday_conversations.txt"
+  ],
+  "ENV": {
+    "V14B_INIT_BRAIN": "/engram-weights/engram_weights.pth",
+    "V14B_INIT_ENGRAM": "/engram-weights/engram_memory_module.pth",
+    "V14B_INIT_VOCAB": "/engram-weights/engram_memory",
+    "V14B_FREEZE_BRAIN_EPOCH_0": "false",
+    "V14B_SURPRISE_MOD": "true"
+  }
+}

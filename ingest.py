@@ -481,10 +481,20 @@ def main():
                 [word_to_global_idx[w] for w in target_words], dtype=torch.long
             ).to(DEVICE)
             logits = (predicted_norm @ vocab_matrix_normed.T) * INV_TEMPERATURE  # (B, V)
-            ce_loss = F.cross_entropy(logits, target_global_idx)
+            # v15-D: surprise-modulated per-sample reweighting (engram innovation #4 —
+            # signal-modulated learning, dormant since v12). Per-sample xent then scaled
+            # by surprise relative to batch mean. Capped at 3x to match the README claim
+            # ("up to 3× gradient on hard examples"). When V14B_SURPRISE_MOD env=true.
+            if os.environ.get("V14B_SURPRISE_MOD", "").lower() in ("true", "1", "yes", "on"):
+                per_sample_xent = F.cross_entropy(logits, target_global_idx, reduction='none')
+                with torch.no_grad():
+                    batch_mean = per_sample_xent.mean()
+                    surprise_scale = torch.clamp(per_sample_xent / (batch_mean + 1e-8), max=3.0)
+                ce_loss = (per_sample_xent * surprise_scale).mean()
+            else:
+                ce_loss = F.cross_entropy(logits, target_global_idx)
 
-            ponder_cost = 0.02 * ponder_steps  # v15-A: lowered 0.05 → 0.02 alongside max_ponder 3 → 5
-                                                # so halt gate has incentive to actually use the deeper budget
+            ponder_cost = 0.05 * ponder_steps  # encourage halt gate to stop early for easy tokens
 
             # Coherence penalty (v6-v11) was a hack to align MSE prediction with n-gram
             # direction. Cross-entropy already forces commitment to a specific token,
