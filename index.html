@@ -121,58 +121,70 @@ a:hover{text-decoration:underline}
   <div class="header">
     <div>
       <div class="logo">engram</div>
-      <div class="subtitle">v13_xent_temp30 · Status Report</div>
+      <div class="subtitle">v14_branchb_learnable_vocab · Status Report</div>
     </div>
     <div class="header-right">
       <a class="chat-link" href="http://108.181.97.223:5000" target="_blank">
         Try Engram →
       </a>
-      <span class="updated">Updated: 2026-05-04 UTC</span>
+      <span class="updated">Updated: 2026-05-05 UTC</span>
     </div>
   </div>
 
   <!-- Honest status banner -->
-  <div class="card" style="margin-bottom:24px;border:1px solid var(--yellow)">
-    <div class="card-title" style="color:var(--yellow)">Status — v13_xent_temp30: Sharper Temperature Dropped Loss 2.34 Nats. Output Is Still Token-Soup. Frozen Vocab Is Now the Suspect.</div>
+  <div class="card" style="margin-bottom:24px;border:1px solid var(--green)">
+    <div class="card-title" style="color:var(--green)">Status — v14_branchb_learnable_vocab: Vocab Was the Bottleneck. Branch B Confirmed. First Recognizable Dialog Output.</div>
     <p style="font-size:0.9rem;line-height:1.6">
-      Update 2026-05-04: <strong>v13_xent_temp30 deployed live</strong> — single-variable swap from v12: INV_TEMPERATURE raised from 10 to 30
-      (<span class="mono">predicted_norm @ vocab_matrix_normed.T * INV_TEMP=30</span>).
-      Architecture and corpus are identical to v12 (12 layers, 384D, 12H, RoPE, Pre-LN, AdamW, ~21.5M brain / ~38.7M engram params,
-      vocab 14,704, context 32, 5.3 MB corpus). Trained 2026-05-04 on Modal L4, $6.00.
+      Update 2026-05-05: <strong>v14_branchb_learnable_vocab deployed live</strong> — single architectural change from v13:
+      <span class="mono">vocab_matrix_global</span> is now an <span class="mono">nn.Parameter</span> (~5.6M trainable parameters)
+      trained alongside the brain via AdamW with <span class="mono">lr=EMBED_LR/2=2.5e-4</span>.
+      Brain was warm-started from v13 final and frozen for epoch 1 so the vocab could adjust against fixed brain predictions,
+      then unfrozen for epochs 2–5 (joint training). Architecture otherwise identical to v13:
+      12L / 384D / 12H / RoPE / Pre-LN / AdamW, vocab 14,704, context 32, 5.3 MB corpus. Trained 2026-05-05 on Modal L4, $8.00.
     </p>
     <p style="font-size:0.9rem;line-height:1.6;margin-top:8px">
-      <strong>Loss result:</strong> final loss <strong>5.04 nats</strong> (vs v12's 7.38) — a 2.34 nat absolute reduction.
-      Theoretical floor at INV_TEMP=30: ≈0.59 nats (dropped 1.18 nats from v12's ≈1.77).
-      Net headroom-above-floor narrowed only ~1.16 nats (5.6 → 4.45).
-      Convergence remained healthy — the sharper temperature did exactly what it was supposed to do for the loss signal.
+      <strong>Loss curve (the key evidence):</strong>
+      v13 final plateau: 5.04 nats.
+      Epoch 1 end (brain frozen, only vocab moving): <strong>4.7854</strong> — already 0.25 nats below v13 with the brain frozen.
+      Epoch 2 (brain unfrozen, joint training): 4.0939.
+      Epoch 3: 3.5592.
+      Epoch 4: 3.0563.
+      Epoch 5 final: <strong>2.7059</strong> — 2.34 nats below v13, ~2.12 nats above the theoretical floor at INV_TEMP=30 (≈0.59).
     </p>
     <p style="font-size:0.9rem;line-height:1.6;margin-top:8px">
-      <strong>Eval verdict — PARTIAL/FAIL. Output is incoherent.</strong>
-      Replies differ per prompt (distinct criterion: PASS). <span class="mono">avg_ponder</span> consistently 2.7–2.9 (halt-gate cap=3),
-      indicating the halt gate is near saturation — the model is using almost all available pondering steps before halting.
-      But output is token-soup — not English sentences. Coherence did not change versus v12.
+      <strong>Smoking gun — epoch 1 with brain frozen.</strong>
+      The fact that loss broke through v13's 5.04 plateau in epoch 1 with the brain still frozen is the clean ablation:
+      vocab geometry was the bottleneck.
+      The sentence-transformer initialization optimizes for semantic similarity ("cat" near "dog"), not syntactic prediction
+      ("cat" followed by "is").
+      Letting the vocab learn under the cross-entropy gradient unlocked the descent.
     </p>
     <p style="font-size:0.9rem;line-height:1.6;margin-top:8px">
-      <strong>Diagnosis:</strong> the brain can reduce loss via sharper temperature — it is genuinely getting better gradient signal.
-      But the predicted concept vectors are not landing on coherent ChromaDB tokens.
-      The vocab embeddings are frozen: initialized once from the teacher model and never updated during training.
-      A more confident brain pointing in random directions of a frozen vocab space produces no better text.
-      The sharpened softmax is pushing harder on a target that was never trained to align with it.
+      <strong>Eval verdict — PARTIAL. Qualitatively much improved, not yet fully coherent.</strong>
+      Output now produces real English fragments and recognizable conversational/scheduling patterns from the dailydialog corpus.
+      Sample outputs: <span class="mono">"hi how about tomorrow coming to account on friday"</span>,
+      <span class="mono">"okay how about one week user what time bot at ten to p after"</span>,
+      <span class="mono">"ten minutes walk"</span>,
+      <span class="mono">"i love you very long"</span>.
+      Compare v13's token-soup: <span class="mono">"today we who had selling how me user"</span>.
+      Replies are not yet fully coherent multi-turn dialogue but this is by far the cleanest signal yet —
+      dialog-shaped text is appearing for the first time.
     </p>
     <p style="font-size:0.9rem;line-height:1.6;margin-top:8px">
-      <strong>What this rules out:</strong> temperature calibration was a real bottleneck for the loss metric, but it is not the
-      bottleneck for coherence. The fundamental issue is that the vocab embedding matrix is static.
-      The model brain learns to predict concept vectors; those vectors are decoded via nearest-neighbor lookup against
-      frozen embeddings. If the frozen embeddings do not form a geometry that the brain's predictions can converge on,
-      no amount of temperature adjustment will produce coherent tokens.
+      <strong>Significance of Branch B.</strong>
+      Branch B is one of engram's core architectural bets: vocab/brain as separable, swappable components.
+      v14-B is the first run to exercise the "learnable" half of "learnable 96-D coordinates" under cross-entropy training.
+      The frozen sentence-transformer geometry optimized for semantic similarity turns out to be hostile to syntactic
+      prediction — these are different tasks, and the gradient needed to move the vocab to find out.
     </p>
     <p style="font-size:0.9rem;line-height:1.6;margin-top:8px">
-      <strong>Next — v14 Branch B:</strong> make the ChromaDB vocab a learnable <span class="mono">nn.Parameter</span>.
-      This is the architectural change implied by the v13 result.
-      Branch A (lift halt-gate cap from 3 to a higher value, given saturated <span class="mono">avg_ponder</span>) is queued as a parallel signal.
-      See <span class="mono">plans/V14_CANDIDATES.md</span> for the full decision tree (branches A/B/C/D)
-      and <span class="mono">plans/FUTURE_RESEARCH.md</span> for the v15+ backlog.
-      Cumulative spend: ~$57 of $150 budget ceiling.
+      <strong>Next — Branches A, C, D from V14_CANDIDATES.md.</strong>
+      Branch A (raise halt-gate cap from 3 → 5 + lower ponder cost) is most likely next:
+      <span class="mono">avg_ponder</span> is still pegging at 3.00 (the cap), meaning the adaptive-compute lever is not yet engaged.
+      Branch D (surprise-modulated gradient) and Branch C (episodic memory at training time) are the remaining axes.
+      After A/C/D land, <span class="mono">plans/FUTURE_RESEARCH.md</span> picks up at v15+
+      (∇-Reasoner is the recommended first follow-on, zero training cost).
+      Cumulative spend: ~$73 of $150 budget ceiling.
     </p>
   </div>
 
@@ -183,25 +195,26 @@ a:hover{text-decoration:underline}
     <div class="card">
       <div class="card-title">Active Deployment</div>
       <div class="score-gauge">
-        <div><span class="score-big" style="font-size:2.1rem;color:var(--cyan)">v13_xent_temp30</span></div>
-        <div><span class="status-badge" style="background:var(--yellow);color:#000">LIVE · TOKEN SOUP (frozen vocab is the bottleneck)</span></div>
-        <div class="score-ts">Trained 2026-05-04 · Modal L4 GPU · $6.00</div>
+        <div><span class="score-big" style="font-size:1.8rem;color:var(--cyan)">v14_branchb_learnable_vocab</span></div>
+        <div><span class="status-badge" style="background:var(--green);color:#000">LIVE · PARTIAL · Dialog fragments</span></div>
+        <div class="score-ts">Trained 2026-05-05 · Modal L4 GPU · $8.00</div>
         <div class="failure-tags" style="justify-content:center;margin-top:10px">
           <span class=tag style="border-color:var(--green);color:var(--green)">Pre-LN</span>
           <span class=tag style="border-color:var(--green);color:var(--green)">AdamW</span>
           <span class=tag style="border-color:var(--green);color:var(--green)">RoPE</span>
           <span class=tag style="border-color:var(--green);color:var(--green)">cosine x-ent</span>
-          <span class=tag style="border-color:var(--green);color:var(--green)">21.5M params</span>
+          <span class=tag style="border-color:var(--green);color:var(--green)">21.5M brain params</span>
           <span class=tag style="border-color:var(--green);color:var(--green)">vocab 14,704</span>
+          <span class=tag style="border-color:var(--green);color:var(--green)">learnable vocab ~5.6M params</span>
           <span class=tag style="border-color:var(--yellow);color:var(--yellow)">INV_TEMP=30</span>
-          <span class=tag style="border-color:var(--red);color:var(--red)">frozen vocab embeddings</span>
+          <span class=tag style="border-color:var(--yellow);color:var(--yellow)">avg_ponder pegged at 3.00</span>
         </div>
       </div>
     </div>
 
     <!-- Training metrics -->
     <div class="card">
-      <div class="card-title">v13 Training Metrics</div>
+      <div class="card-title">v14-B Training Metrics</div>
       <div class="sub-score-row">
         <span class="sub-label muted">distinct</span>
         <div class="bar-track"><div class="bar-fill" style="width:100%;background:var(--green)"></div></div>
@@ -209,18 +222,18 @@ a:hover{text-decoration:underline}
       </div>
       <div class="sub-score-row">
         <span class="sub-label muted">avg_ponder</span>
-        <div class="bar-track"><div class="bar-fill" style="width:90%;background:var(--yellow)"></div></div>
-        <span class="sub-val mono" style="color:var(--yellow)">2.8</span>
+        <div class="bar-track"><div class="bar-fill" style="width:100%;background:var(--yellow)"></div></div>
+        <span class="sub-val mono" style="color:var(--yellow)">3.00</span>
       </div>
       <div class="sub-score-row">
-        <span class="sub-label muted">coherent</span>
-        <div class="bar-track"><div class="bar-fill" style="width:5%;background:var(--red)"></div></div>
-        <span class="sub-val mono" style="color:var(--red)">0/5</span>
+        <span class="sub-label muted">fragments</span>
+        <div class="bar-track"><div class="bar-fill" style="width:65%;background:var(--yellow)"></div></div>
+        <span class="sub-val mono" style="color:var(--yellow)">PARTIAL</span>
       </div>
       <div class="sub-score-row">
         <span class="sub-label muted">final loss</span>
-        <div class="bar-track"><div class="bar-fill" style="width:18%;background:var(--yellow)"></div></div>
-        <span class="sub-val mono" style="color:var(--yellow)">5.04</span>
+        <div class="bar-track"><div class="bar-fill" style="width:46%;background:var(--green)"></div></div>
+        <span class="sub-val mono" style="color:var(--green)">2.71</span>
       </div>
     </div>
 
@@ -235,7 +248,7 @@ a:hover{text-decoration:underline}
     </div>
     <div class="info-row">
       <span class="info-key">Active model</span>
-      <span class="info-val mono" style="color:var(--cyan)">v13_xent_temp30</span>
+      <span class="info-val mono" style="color:var(--cyan)">v14_branchb_learnable_vocab</span>
     </div>
     <div class="info-row">
       <span class="info-key">Architecture</span>
@@ -255,7 +268,11 @@ a:hover{text-decoration:underline}
     </div>
     <div class="info-row">
       <span class="info-key">Vocab size</span>
-      <span class="info-val mono">14,704 (frozen embeddings — initialized from teacher, not updated)</span>
+      <span class="info-val mono">14,704 — now learnable nn.Parameter (~5.6M trainable params); warm-started from sentence-transformer init</span>
+    </div>
+    <div class="info-row">
+      <span class="info-key">Vocab training schedule</span>
+      <span class="info-val mono">epoch 1: brain frozen, vocab only (lr=2.5e-4); epochs 2–5: joint training (brain + vocab)</span>
     </div>
     <div class="info-row">
       <span class="info-key">Corpus</span>
@@ -263,15 +280,19 @@ a:hover{text-decoration:underline}
     </div>
     <div class="info-row">
       <span class="info-key">Training</span>
-      <span class="info-val mono">5 epochs · Modal L4 · 2026-05-04</span>
+      <span class="info-val mono">5 epochs · Modal L4 · 2026-05-05</span>
+    </div>
+    <div class="info-row">
+      <span class="info-key">Per-epoch loss</span>
+      <span class="info-val mono">ep1 (brain frozen): 4.7854 · ep2: 4.0939 · ep3: 3.5592 · ep4: 3.0563 · ep5: 2.7059</span>
     </div>
     <div class="info-row">
       <span class="info-key">Final loss</span>
-      <span class="info-val mono">5.04 nats (theoretical floor at INV_TEMP=30: ≈0.59 — 4.45 nats headroom)</span>
+      <span class="info-val mono">2.7059 nats (theoretical floor at INV_TEMP=30: ≈0.59 — 2.12 nats headroom)</span>
     </div>
     <div class="info-row">
       <span class="info-key">Training cost</span>
-      <span class="info-val mono">$6.00 · cumulative ~$57 of $150 ceiling</span>
+      <span class="info-val mono">$8.00 · cumulative ~$73 of $150 ceiling</span>
     </div>
     <div class="info-row">
       <span class="info-key">Platform</span>
@@ -349,7 +370,7 @@ a:hover{text-decoration:underline}
 
   <!-- What we've learned -->
   <div class="card" style="margin-bottom:24px">
-    <div class="card-title">What We've Learned — v8 through v13</div>
+    <div class="card-title">What We've Learned — v8 through v14</div>
     <p style="font-size:0.85rem;color:var(--muted);margin-bottom:12px">
       Each run tested one hypothesis. Architecture has been stable since v6 (Pre-LN + AdamW + RoPE).
     </p>
@@ -410,16 +431,16 @@ a:hover{text-decoration:underline}
           <td class="small">Temperature — INV_TEMP 10 → 30; all else frozen</td>
           <td class="mono">5.04 nats (x-ent)</td>
           <td class="mono">14,704</td>
-          <td><span class="badge" style="color:var(--red);border-color:var(--red)">FAIL</span></td>
-          <td class="muted small">Loss dropped 2.34 nats. avg_ponder saturated at 2.7–2.9 (cap=3). Output still token-soup. Temperature calibration hypothesis partially supported for loss, refuted for coherence. Frozen vocab embeddings are the new prime suspect — brain predictions land in wrong regions of static vocab space.</td>
+          <td><span class="badge" style="color:var(--muted);border-color:var(--muted)">REPLACED</span></td>
+          <td class="muted small">Loss dropped 2.34 nats. avg_ponder saturated at 2.7–2.9 (cap=3). Output still token-soup. Temperature calibration hypothesis partially supported for loss, refuted for coherence. Frozen vocab embeddings identified as bottleneck.</td>
         </tr>
         <tr>
-          <td class="mono" style="color:var(--purple)">v14 (planned)</td>
-          <td class="small">Branch B: make ChromaDB vocab a learnable nn.Parameter; Branch A: lift halt-gate cap above 3</td>
-          <td class="mono muted">TBD</td>
-          <td class="mono">14,704</td>
-          <td><span class="badge" style="color:var(--purple);border-color:var(--purple)">PLANNED</span></td>
-          <td class="muted small">If vocab is learnable, brain predictions and token space can co-adapt. Branch A tests whether saturated avg_ponder is an independent signal. See plans/V14_CANDIDATES.md.</td>
+          <td class="mono" style="color:var(--cyan)">v14_branchb_learnable_vocab</td>
+          <td class="small">Branch B: vocab_matrix_global made nn.Parameter (~5.6M params); brain frozen ep1, joint training ep2–5</td>
+          <td class="mono">2.7059 nats (x-ent)</td>
+          <td class="mono">14,704 (learnable)</td>
+          <td><span class="badge" style="color:var(--green);border-color:var(--green)">PARTIAL · BRANCH B CONFIRMED</span></td>
+          <td class="muted small">Loss broke below v13's 5.04 plateau in epoch 1 with brain frozen — vocab geometry was the bottleneck. Final loss 2.7059 (2.34 nats below v13). Output shows real English fragments and dialog patterns for the first time. avg_ponder pegged at cap=3 — adaptive-compute lever still not engaged. Branches A/C/D queued.</td>
         </tr>
       </tbody>
     </table>
@@ -518,29 +539,29 @@ a:hover{text-decoration:underline}
 
   <!-- Logical next steps -->
   <div class="card" style="margin-bottom:24px">
-    <div class="card-title">Logical Next Steps (updated 2026-05-04)</div>
+    <div class="card-title">Logical Next Steps (updated 2026-05-05)</div>
     <ol style="font-size:0.9rem;line-height:1.8;padding-left:24px">
       <li>
-        <strong>v14 Branch B — make ChromaDB vocab a learnable nn.Parameter.</strong>
-        v13 demonstrated that a more confident brain pointing into a frozen vocab space produces no improvement in coherence.
-        The diagnosis is clear: the vocab embedding matrix is initialized once from the teacher and never updated.
-        Making it an <span class="mono" style="font-size:0.85rem">nn.Parameter</span> allows the token space to co-adapt
-        with the brain's predictions during training.
-        This is the architectural break the v13 result points to.
+        <strong>Branch A — raise halt-gate cap from 3 → 5, lower ponder cost.</strong>
+        <span class="mono">avg_ponder</span> is pegging at exactly 3.00 (the current cap) in v14-B evals,
+        which means the adaptive-compute lever is not engaged — the model is always running to the cap rather
+        than learning to halt earlier on easy tokens. Raising the cap to 5 and reducing the ponder cost
+        will test whether the model can learn differentiated pondering depth.
+        This is a relatively cheap single-variable change.
+        See <span class="mono" style="font-size:0.85rem">plans/V14_CANDIDATES.md</span>.
       </li>
       <li>
-        <strong>v14 Branch A — lift the halt-gate cap above 3.</strong>
-        avg_ponder was consistently 2.7–2.9 across v13 evals, indicating the gate is nearly saturated at the cap=3 ceiling.
-        This is an independent signal worth testing in parallel: if the model wants to ponder more steps but is being cut off,
-        we may be artificially limiting its reasoning depth.
-        This is a cheaper experiment than Branch B and can run concurrently.
-        See <span class="mono" style="font-size:0.85rem">plans/V14_CANDIDATES.md</span> for branches C and D as well.
+        <strong>Branches C and D — episodic memory and surprise-modulated gradient.</strong>
+        Branch C adds episodic memory at training time; Branch D modulates the loss gradient by
+        per-token prediction surprise. Both are independent axes that can be tested after Branch A.
+        Order and priority are documented in <span class="mono" style="font-size:0.85rem">plans/V14_CANDIDATES.md</span>.
       </li>
       <li>
-        <strong>Remaining variables to defer.</strong>
-        Four levers have been tested and refuted (capacity, corpus volume, loss function class, temperature calibration).
-        Context length and architecture depth are in the research backlog (<span class="mono" style="font-size:0.85rem">plans/FUTURE_RESEARCH.md</span>)
-        but should not be touched until the vocab-learnability and halt-gate hypotheses are resolved.
+        <strong>v15+ research backlog.</strong>
+        Once Branches A/C/D are resolved, <span class="mono" style="font-size:0.85rem">plans/FUTURE_RESEARCH.md</span>
+        picks up at the ∇-Reasoner follow-on (zero training cost) and other v15+ candidates.
+        The core vocab/brain architecture is now validated and coherent dialog fragments are appearing —
+        further work should stack on this foundation rather than revisiting architecture fundamentals.
       </li>
     </ol>
   </div>
@@ -559,16 +580,16 @@ a:hover{text-decoration:underline}
       </thead>
       <tbody>
         <tr>
-          <td class="mono muted">TBD</td>
-          <td class="mono" style="color:var(--purple)">v14</td>
-          <td><span class="badge" style="color:var(--purple);border-color:var(--purple)">PLANNED · VOCAB LEARNABILITY + HALT-GATE CAP</span></td>
-          <td class="muted small">Branch B: make ChromaDB vocab an nn.Parameter (learnable); Branch A: raise halt-gate cap above 3 (avg_ponder 2.7–2.9 near saturation). See plans/V14_CANDIDATES.md.</td>
+          <td class="mono muted">2026-05-05</td>
+          <td class="mono" style="color:var(--cyan)">v14_branchb_learnable_vocab</td>
+          <td><span class="badge" style="color:var(--green);border-color:var(--green)">LIVE · PARTIAL · Branch B confirmed</span></td>
+          <td class="muted small">vocab_matrix_global → nn.Parameter (~5.6M learnable); brain frozen ep1, joint ep2–5; ep1 loss 4.7854 (below v13's 5.04 with brain frozen — vocab was the bottleneck); final loss 2.7059 nats; distinct PASS, dialog fragments present, not fully coherent; avg_ponder 3.00 (cap); $8.00 · cumulative ~$73</td>
         </tr>
         <tr>
           <td class="mono muted">2026-05-04</td>
-          <td class="mono" style="color:var(--cyan)">v13_xent_temp30</td>
-          <td><span class="badge" style="color:var(--yellow);border-color:var(--yellow)">LIVE · TOKEN SOUP (frozen vocab bottleneck)</span></td>
-          <td class="muted small">INV_TEMP 10 → 30; 5 epochs; final loss 5.04 nats (floor ≈0.59, headroom 4.45 — down 1.16 from v12); distinct PASS, avg_ponder 2.7–2.9 (near cap saturation), coherent FAIL; $6.00 · cumulative ~$57</td>
+          <td class="mono">v13_xent_temp30</td>
+          <td><span class="badge" style="color:var(--muted);border-color:var(--muted)">REPLACED</span></td>
+          <td class="muted small">INV_TEMP 10 → 30; 5 epochs; final loss 5.04 nats (floor ≈0.59, headroom 4.45); distinct PASS, avg_ponder 2.7–2.9 (near cap saturation), coherent FAIL; $6.00 · cumulative ~$57; frozen vocab identified as bottleneck</td>
         </tr>
         <tr>
           <td class="mono muted">2026-05-03</td>
@@ -649,7 +670,7 @@ a:hover{text-decoration:underline}
   <!-- Footer -->
   <div class="footer">
     <p>engram is an experimental neural language model with adaptive pondering, N-gram memory, and continuous-concept vocabulary. <a href="https://github.com/kent-ai-dev/engram" target="_blank">GitHub</a></p>
-    <p style="margin-top:4px">Status report updated 2026-05-04.</p>
+    <p style="margin-top:4px">Status report updated 2026-05-05.</p>
   </div>
 
 </div>
